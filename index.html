@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DI Loop Library — エージェントループ・ダッシュボード</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<style>
+  /* ===== DESIGN.md トークン（唯一の参照源） ===== */
+  :root{
+    --bg:#F2F4F8; --surface:#FFFFFF; --surface2:#F7F8FB;
+    --ink:#171B2E; --sub:#5B6175; --faint:#8A90A6;
+    --line:#E2E5EE; --line2:#D2D6E4;
+    --primary:#2B4BD8; --primary-ink:#FFFFFF; --primary-soft:#E7EBFB;
+    --ok:#0E8A5F; --shadow:0 1px 2px rgba(23,27,46,.05),0 8px 24px -12px rgba(23,27,46,.12);
+    --radius:14px;
+  }
+  html[data-theme="dark"]{
+    --bg:#0D1020; --surface:#161A2E; --surface2:#1C2138;
+    --ink:#E9EBF5; --sub:#A6ACC4; --faint:#6E7490;
+    --line:#272D48; --line2:#343B5C;
+    --primary:#7B93FF; --primary-ink:#0D1020; --primary-soft:#23294A;
+    --ok:#3FCE9A; --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 28px -12px rgba(0,0,0,.55);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{scroll-behavior:smooth}
+  body{
+    font-family:"IBM Plex Sans JP",system-ui,sans-serif;
+    background:var(--bg); color:var(--ink);
+    font-size:14.5px; line-height:1.65;
+    transition:background .25s,color .25s;
+  }
+  .mono{font-family:"IBM Plex Mono",monospace}
+  button{font-family:inherit;cursor:pointer}
+  .wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+
+  /* ===== Header ===== */
+  header{
+    position:sticky;top:0;z-index:40;
+    background:color-mix(in srgb,var(--bg) 86%,transparent);
+    backdrop-filter:blur(10px);
+    border-bottom:1px solid var(--line);
+  }
+  .hd{display:flex;align-items:center;gap:14px;height:62px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .loopmark{
+    width:34px;height:34px;flex:none;color:var(--primary);
+    transition:transform .6s cubic-bezier(.34,1.56,.64,1);
+  }
+  .brand:hover .loopmark{transform:rotate(180deg)}
+  .brand h1{font-size:15px;font-weight:700;letter-spacing:.04em;line-height:1.2}
+  .brand .sub{font-size:11px;color:var(--faint);font-weight:500;letter-spacing:.08em}
+  .hd-spacer{flex:1}
+  .hd-count{font-size:12px;color:var(--sub)}
+  .hd-count b{font-family:"IBM Plex Mono";color:var(--ink)}
+  .theme-btn{
+    width:36px;height:36px;border-radius:10px;border:1px solid var(--line2);
+    background:var(--surface);color:var(--sub);font-size:16px;
+    display:grid;place-items:center;transition:.2s;
+  }
+  .theme-btn:hover{color:var(--ink);border-color:var(--primary)}
+
+  /* ===== eyebrow / sections ===== */
+  .eyebrow{
+    font-family:"IBM Plex Mono";font-size:11px;font-weight:600;
+    letter-spacing:.18em;text-transform:uppercase;color:var(--faint);
+    display:flex;align-items:center;gap:10px;margin:30px 0 14px;
+  }
+  .eyebrow::after{content:"";flex:1;height:1px;background:var(--line)}
+
+  /* ===== KPIs ===== */
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .kpi{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;box-shadow:var(--shadow);
+  }
+  .kpi .v{font-family:"IBM Plex Mono";font-size:30px;font-weight:600;line-height:1.1;letter-spacing:-.02em}
+  .kpi .l{font-size:12px;color:var(--sub);margin-top:4px}
+  .kpi .x{font-size:11px;color:var(--faint);margin-top:2px}
+
+  .charts{display:grid;grid-template-columns:1.6fr 1fr;gap:12px;margin-top:12px}
+  .panel{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:18px;box-shadow:var(--shadow);
+  }
+  .panel h3{font-size:13px;font-weight:600;margin-bottom:4px}
+  .panel .hint{font-size:11px;color:var(--faint);margin-bottom:10px}
+  .chart-box{position:relative}
+  #axisChartBox{height:460px}
+  #catChartBox{height:230px}
+  .trig-rows{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+  .trig-row{display:flex;align-items:center;gap:10px;font-size:12px}
+  .trig-row .tl{width:74px;color:var(--sub);font-family:"IBM Plex Mono";font-size:11px}
+  .trig-bar{flex:1;height:10px;border-radius:6px;background:var(--surface2);overflow:hidden}
+  .trig-bar i{display:block;height:100%;border-radius:6px;transition:width .6s ease}
+  .trig-row .tv{width:46px;text-align:right;font-family:"IBM Plex Mono";font-size:12px}
+
+  /* ===== Axis tabs ===== */
+  .axis-tabs{display:flex;gap:6px;background:var(--surface2);border:1px solid var(--line2);
+    border-radius:11px;padding:4px;width:max-content;max-width:100%}
+  .axis-tab{
+    border:none;background:none;color:var(--sub);font-size:13px;font-weight:600;
+    padding:7px 16px;border-radius:8px;transition:.15s;white-space:nowrap;
+  }
+  .axis-tab:hover{color:var(--ink)}
+  .axis-tab.on{background:var(--surface);color:var(--primary);box-shadow:var(--shadow)}
+
+  /* ===== Pain selector (課題から探す) ===== */
+  .pain-wrap{margin-top:12px}
+  .pain-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+  .pain-card{
+    text-align:left;border:1px solid var(--line2);background:var(--surface2);
+    border-radius:11px;padding:11px 13px;transition:.15s;color:var(--ink);
+  }
+  .pain-card:hover{border-color:var(--primary);transform:translateY(-1px)}
+  .pain-card.on{border-color:var(--primary);background:var(--primary-soft)}
+  .pain-card .pt{font-size:13px;font-weight:600;display:flex;justify-content:space-between;gap:8px;align-items:center}
+  .pain-card .pc{font-family:"IBM Plex Mono";font-size:11px;color:var(--faint);flex:none}
+  .pain-card .pd{font-size:11px;color:var(--sub);margin-top:3px;line-height:1.45}
+
+  /* ===== Filters ===== */
+  .filters{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px 18px;box-shadow:var(--shadow);
+    display:flex;flex-direction:column;gap:12px;
+  }
+  .f-row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+  .search-box{position:relative;flex:1;min-width:240px}
+  .search-box svg{position:absolute;left:12px;top:50%;transform:translateY(-50%);width:15px;height:15px;color:var(--faint)}
+  .search-box input{
+    width:100%;padding:9px 34px 9px 36px;border-radius:10px;
+    border:1px solid var(--line2);background:var(--surface2);color:var(--ink);
+    font-family:inherit;font-size:13.5px;outline:none;transition:.2s;
+  }
+  .search-box input:focus{border-color:var(--primary);box-shadow:0 0 0 3px var(--primary-soft)}
+  .search-clear{
+    position:absolute;right:8px;top:50%;transform:translateY(-50%);
+    border:none;background:none;color:var(--faint);font-size:14px;display:none;
+    width:22px;height:22px;border-radius:6px;
+  }
+  .search-clear:hover{color:var(--ink);background:var(--surface)}
+  select.sel{
+    padding:9px 12px;border-radius:10px;border:1px solid var(--line2);
+    background:var(--surface2);color:var(--ink);font-family:inherit;font-size:13px;
+    min-width:200px;outline:none;
+  }
+  select.sel:focus{border-color:var(--primary)}
+  .f-label{font-size:11px;font-family:"IBM Plex Mono";letter-spacing:.1em;color:var(--faint);text-transform:uppercase;width:84px;flex:none}
+  .chips{display:flex;flex-wrap:wrap;gap:6px}
+  .chip{
+    padding:5px 12px;border-radius:999px;font-size:12px;font-weight:500;
+    border:1px solid var(--line2);background:var(--surface2);color:var(--sub);transition:.15s;
+  }
+  .chip:hover{border-color:var(--primary);color:var(--ink)}
+  .chip.on{background:var(--primary);border-color:var(--primary);color:var(--primary-ink)}
+  .f-state{display:flex;flex-wrap:wrap;gap:8px;align-items:center;border-top:1px dashed var(--line);padding-top:12px}
+  .result-count{font-size:12.5px;color:var(--sub)}
+  .result-count b{font-family:"IBM Plex Mono";color:var(--ink);font-size:14px}
+  .active-pill{
+    display:inline-flex;align-items:center;gap:6px;
+    background:var(--primary-soft);color:var(--primary);
+    border:none;border-radius:999px;padding:4px 11px;font-size:12px;font-weight:600;
+  }
+  html[data-theme="dark"] .active-pill{color:#AEBDFF}
+  .active-pill:hover{text-decoration:line-through}
+  .clear-all{border:none;background:none;color:var(--faint);font-size:12px;text-decoration:underline}
+  .clear-all:hover{color:var(--ink)}
+
+  /* ===== axis detail strip ===== */
+  .axis-detail{
+    margin-top:12px;border-radius:var(--radius);padding:18px;box-shadow:var(--shadow);
+    border:1px solid var(--line);background:linear-gradient(135deg,var(--surface),var(--surface2));
+    display:none;
+  }
+  .axis-detail.show{display:block;animation:fadeUp .3s ease}
+  .axis-detail .sd-head{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}
+  .axis-detail h3{font-size:16px;font-weight:700}
+  .axis-detail .sd-count{font-family:"IBM Plex Mono";font-size:12px;color:var(--sub)}
+  .axis-detail p{font-size:13px;color:var(--sub);margin-top:4px}
+
+  /* ===== Cards ===== */
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:16px}
+  .card{
+    background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);
+    padding:16px;box-shadow:var(--shadow);display:flex;flex-direction:column;gap:10px;
+    transition:transform .15s,border-color .15s;animation:fadeUp .25s ease both;
+  }
+  .card:hover{transform:translateY(-2px);border-color:var(--line2)}
+  @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .badges{display:flex;flex-wrap:wrap;gap:5px}
+  .badge{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:6px;letter-spacing:.02em}
+  .badge.svc{color:#fff}
+  .badge.ind{color:#fff}
+  .badge.cat{background:var(--surface2);border:1px solid var(--line2);color:var(--sub)}
+  .badge.trg{font-family:"IBM Plex Mono";font-size:10px;border:1px solid var(--line2);color:var(--faint);background:transparent}
+  .badge.trg.interval{color:var(--ok);border-color:color-mix(in srgb,var(--ok) 40%,transparent)}
+  .card h4{font-size:14px;font-weight:600;line-height:1.45}
+  .card .goal{font-size:12.5px;color:var(--sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .card .strat{
+    font-size:11.5px;color:var(--faint);background:var(--surface2);border-radius:8px;
+    padding:7px 9px;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden;
+    border-left:3px solid var(--primary);
+  }
+  .iter-line{display:flex;align-items:center;gap:10px;background:var(--surface2);border-radius:10px;padding:8px 10px}
+  .ring{flex:none;width:34px;height:34px}
+  .ring circle.track{fill:none;stroke:var(--line2);stroke-width:3}
+  .ring circle.val{fill:none;stroke:var(--primary);stroke-width:3;stroke-linecap:round;transform:rotate(-90deg);transform-origin:center}
+  .ring text{font-family:"IBM Plex Mono";font-size:11px;font-weight:600;fill:var(--ink)}
+  .iter-line .exit{font-size:11.5px;color:var(--sub);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .iter-line .exit b{color:var(--faint);font-weight:600;font-size:10px;font-family:"IBM Plex Mono";display:block;letter-spacing:.08em}
+  .kpi-tags,.pain-tags{display:flex;flex-wrap:wrap;gap:4px}
+  .ktag{font-size:10px;font-family:"IBM Plex Mono";color:var(--sub);background:var(--surface2);border:1px solid var(--line);border-radius:5px;padding:1px 6px}
+  .ptag{font-size:10px;color:var(--primary);background:var(--primary-soft);border-radius:5px;padding:1px 7px;font-weight:600}
+  html[data-theme="dark"] .ptag{color:#AEBDFF}
+  .card-foot{display:flex;align-items:center;gap:8px;margin-top:auto;padding-top:8px;border-top:1px solid var(--line)}
+  .agents{font-size:10.5px;color:var(--faint);flex:1;font-family:"IBM Plex Mono"}
+  .btn{
+    border-radius:9px;font-size:12px;font-weight:600;padding:7px 13px;transition:.15s;
+    border:1px solid var(--line2);background:var(--surface);color:var(--ink);
+  }
+  .btn:hover{border-color:var(--primary);color:var(--primary)}
+  .btn.primary{background:var(--primary);border-color:var(--primary);color:var(--primary-ink)}
+  .btn.primary:hover{filter:brightness(1.08);color:var(--primary-ink)}
+  .btn.copied{background:var(--ok);border-color:var(--ok);color:#fff}
+  .empty{grid-column:1/-1;text-align:center;padding:60px 20px;color:var(--sub);
+    background:var(--surface);border:1px dashed var(--line2);border-radius:var(--radius)}
+  .empty b{display:block;font-size:15px;margin-bottom:6px;color:var(--ink)}
+
+  /* ===== Pagination ===== */
+  .pager{display:flex;justify-content:center;align-items:center;gap:6px;margin:26px 0 60px;flex-wrap:wrap}
+  .pbtn{min-width:36px;height:36px;padding:0 10px;border-radius:9px;font-family:"IBM Plex Mono";font-size:12.5px;
+    border:1px solid var(--line2);background:var(--surface);color:var(--sub)}
+  .pbtn:hover:not(:disabled){border-color:var(--primary);color:var(--primary)}
+  .pbtn.on{background:var(--primary);border-color:var(--primary);color:var(--primary-ink);font-weight:600}
+  .pbtn:disabled{opacity:.4;cursor:default}
+  .pdots{color:var(--faint);font-family:"IBM Plex Mono"}
+  .pinfo{width:100%;text-align:center;font-size:11.5px;color:var(--faint);margin-top:6px;font-family:"IBM Plex Mono"}
+
+  /* ===== Modal ===== */
+  .overlay{position:fixed;inset:0;z-index:100;background:rgba(10,12,24,.55);backdrop-filter:blur(3px);
+    display:none;align-items:flex-start;justify-content:center;padding:5vh 16px;overflow-y:auto}
+  .overlay.show{display:flex}
+  .modal{background:var(--surface);border:1px solid var(--line);border-radius:18px;
+    width:min(840px,100%);box-shadow:0 24px 80px rgba(0,0,0,.35);
+    animation:fadeUp .25s ease;display:flex;flex-direction:column;max-height:90vh}
+  .m-head{padding:20px 22px 14px;border-bottom:1px solid var(--line);display:flex;gap:12px;align-items:flex-start}
+  .m-head .m-title{flex:1}
+  .m-head h3{font-size:16px;font-weight:700;line-height:1.45;margin-top:6px}
+  .m-close{flex:none;width:34px;height:34px;border-radius:9px;border:1px solid var(--line2);
+    background:var(--surface2);color:var(--sub);font-size:15px}
+  .m-close:hover{color:var(--ink)}
+  .m-body{padding:18px 22px;overflow-y:auto}
+  .m-sec{margin-bottom:16px}
+  .m-sec > b.lbl{font-size:11px;font-family:"IBM Plex Mono";letter-spacing:.12em;color:var(--faint);
+    text-transform:uppercase;display:block;margin-bottom:7px}
+  .strat-box{background:var(--surface2);border-left:3px solid var(--primary);border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.7}
+  .strat-box .row{margin-bottom:6px}
+  .strat-box .row:last-child{margin-bottom:0}
+  .strat-box .tag{font-family:"IBM Plex Mono";font-size:10px;color:var(--primary);font-weight:600}
+  .m-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
+  .m-meta .mm{background:var(--surface2);border-radius:10px;padding:10px 12px}
+  .m-meta .mm b{display:block;font-size:10px;font-family:"IBM Plex Mono";letter-spacing:.1em;color:var(--faint);text-transform:uppercase;margin-bottom:3px}
+  .m-meta .mm span{font-size:12.5px}
+  /* 6要素サマリー */
+  .six{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .six .el{display:flex;gap:9px;background:var(--surface2);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .six .el .no{flex:none;width:22px;height:22px;border-radius:6px;background:var(--primary);color:var(--primary-ink);
+    font-family:"IBM Plex Mono";font-size:11px;font-weight:600;display:grid;place-items:center}
+  .six .el .tx b{display:block;font-size:11px;font-weight:700}
+  .six .el .tx span{font-size:11.5px;color:var(--sub);line-height:1.5;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  @media (max-width:620px){ .six{grid-template-columns:1fr} }
+  ol.tactics{margin:0;padding-left:20px;font-size:12.5px;line-height:1.7}
+  ol.tactics li{margin-bottom:4px}
+  .chip-list{display:flex;flex-wrap:wrap;gap:6px}
+  .chip-list span{font-size:11.5px;background:var(--surface2);border:1px solid var(--line2);border-radius:7px;padding:3px 9px;color:var(--sub)}
+  ul.guard{margin:0;padding-left:18px;font-size:12px;color:var(--sub);line-height:1.7}
+  .prompt-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+  .prompt-head b{font-size:11px;font-family:"IBM Plex Mono";letter-spacing:.12em;color:var(--faint)}
+  pre.prompt{font-family:"IBM Plex Mono",monospace;font-size:12px;line-height:1.7;
+    background:var(--surface2);border:1px solid var(--line);border-radius:12px;
+    padding:16px;white-space:pre-wrap;word-break:break-word;color:var(--ink)}
+
+  /* ===== Toast ===== */
+  .toast{position:fixed;bottom:24px;left:50%;transform:translate(-50%,80px);z-index:200;
+    background:var(--ink);color:var(--bg);font-size:13px;font-weight:600;
+    padding:10px 20px;border-radius:999px;box-shadow:var(--shadow);
+    transition:transform .3s cubic-bezier(.34,1.4,.64,1);pointer-events:none}
+  .toast.show{transform:translate(-50%,0)}
+
+  footer{border-top:1px solid var(--line);padding:24px 0 40px;color:var(--faint);font-size:11.5px;font-family:"IBM Plex Mono"}
+  :focus-visible{outline:2px solid var(--primary);outline-offset:2px}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+
+  @media (max-width:980px){
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .charts{grid-template-columns:1fr}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .pain-grid{grid-template-columns:repeat(2,1fr)}
+  }
+  @media (max-width:620px){
+    .grid{grid-template-columns:1fr}
+    .kpis{grid-template-columns:repeat(2,1fr)}
+    .pain-grid{grid-template-columns:1fr}
+    .hd-count{display:none}
+    .f-label{width:100%}
+    #axisChartBox{height:420px}
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap hd">
+    <div class="brand">
+      <svg class="loopmark" viewBox="0 0 34 34" fill="none" aria-hidden="true">
+        <path d="M17 4a13 13 0 1 1-9.2 3.8" stroke="currentColor" stroke-width="3" stroke-linecap="round"/>
+        <path d="M7 2v6h6" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <div>
+        <h1>DI LOOP LIBRARY</h1>
+        <div class="sub">AGENT LOOPS × SERVICE × INDUSTRY</div>
+      </div>
+    </div>
+    <div class="hd-spacer"></div>
+    <div class="hd-count" id="hdCount"></div>
+    <button class="theme-btn" id="themeBtn" title="ライト／ダーク切替" aria-label="テーマ切替">◐</button>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- ① サマリー -->
+  <div class="eyebrow">01 / OVERVIEW</div>
+  <div class="kpis" id="kpis"></div>
+
+  <div class="charts">
+    <div class="panel">
+      <h3 id="axisChartTitle">サービス別ループ数</h3>
+      <div class="hint">上部のタブで「サービス別／業種別」を切替・バーをクリックで絞り込み（再クリックで解除）</div>
+      <div style="margin-bottom:12px"><div class="axis-tabs" id="chartAxisTabs" role="tablist"></div></div>
+      <div class="chart-box" id="axisChartBox"><canvas id="axisChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>カテゴリ構成比</h3>
+      <div class="hint">セグメントをクリックでカテゴリ絞り込み</div>
+      <div class="chart-box" id="catChartBox"><canvas id="catChart"></canvas></div>
+      <h3 style="margin-top:18px">トリガー内訳</h3>
+      <div class="trig-rows" id="trigRows"></div>
+    </div>
+  </div>
+
+  <!-- ② 課題から探す -->
+  <div class="eyebrow" id="byPain">02 / 課題からループを探す</div>
+  <div class="panel pain-wrap">
+    <div class="hint">いま抱えている課題を選ぶと、それに効くループを複数提案します（再クリックで解除）</div>
+    <div class="pain-grid" id="painGrid"></div>
+  </div>
+
+  <!-- ③ 絞り込み -->
+  <div class="eyebrow" id="browse">03 / BROWSE &amp; SEARCH</div>
+  <div class="filters">
+    <div class="f-row" style="justify-content:space-between">
+      <div class="axis-tabs" id="filterAxisTabs" role="tablist"></div>
+      <span class="result-count">該当 <b id="count">0</b> 件</span>
+    </div>
+    <div class="f-row">
+      <div class="search-box">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="フリーワード検索（タイトル / Goal / 戦略 / タグ）" autocomplete="off">
+        <button class="search-clear" id="qClear" aria-label="検索をクリア">✕</button>
+      </div>
+      <select id="primarySelect" class="sel" aria-label="主軸で絞り込み"></select>
+    </div>
+    <div class="f-row" id="catRow">
+      <span class="f-label">Category</span>
+      <div class="chips" id="catChips"></div>
+    </div>
+    <div class="f-row" id="trigRow">
+      <span class="f-label">Trigger</span>
+      <div class="chips" id="trigChips"></div>
+    </div>
+    <div class="f-state">
+      <span id="activePills" style="display:contents"></span>
+      <button class="clear-all" id="clearAll" style="display:none">すべて解除</button>
+    </div>
+  </div>
+
+  <!-- 軸詳細（単一選択時） -->
+  <div class="axis-detail" id="axisDetail"></div>
+
+  <!-- カード一覧 -->
+  <div class="grid" id="grid"></div>
+  <div class="pager" id="pager"></div>
+
+</main>
+
+<footer><div class="wrap" id="footMeta"></div></footer>
+
+<!-- モーダル -->
+<div class="overlay" id="overlay" role="dialog" aria-modal="true">
+  <div class="modal">
+    <div class="m-head">
+      <div class="m-title">
+        <div class="badges" id="mBadges"></div>
+        <h3 id="mTitle"></h3>
+      </div>
+      <button class="m-close" id="mClose" aria-label="閉じる">✕</button>
+    </div>
+    <div class="m-body" id="mBody"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast">Copied!</div>
+
+<script>
+"use strict";
+/* ========= 設定 ========= */
+const PER_PAGE = 24;
+const SVC_COLORS = {
+  "strategy":"#2B4BD8","seo":"#0E8A5F","content":"#C77A12","llmo":"#5F2BD8",
+  "ad":"#D8442B","creative-ad":"#B0379B","sns-pr":"#D8266E","web":"#0E7FA8",
+  "cro":"#1F5F5B","dx":"#2D7A35","analysis":"#5A38C9","research":"#7A5230","cmo":"#3A6FB0"
+};
+const IND_COLORS = {
+  "general":"#5B6175","finance":"#1F5F5B","real-estate":"#A04A1F","medical":"#B02E3C",
+  "travel":"#0E7FA8","auto":"#3A6FB0","ec-retail":"#C77A12","btob-saas":"#2B4BD8",
+  "hr-edu":"#2D7A35","public":"#7A5230"
+};
+const CAT_COLORS = {
+  "戦略立案":"#2B4BD8","調査・分析":"#5A38C9","制作・実装":"#0E7FA8",
+  "運用・最適化":"#0E8A5F","品質・コンプラ":"#C77A12","レポート・報告":"#D8266E"
+};
+
+/* ========= 状態 ========= */
+let DATA = null;
+let chartAxis = "service";   // チャートの軸
+let filterAxis = "service";  // 絞り込みの主軸（service/industry/pain）
+let state = { service:"all", industry:"all", pain:"all", category:"all", trigger:"all", q:"", page:1 };
+let filtered = [];
+let axisChart = null, catChart = null;
+
+/* ========= ユーティリティ ========= */
+const $ = s => document.querySelector(s);
+const esc = s => String(s).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const debounce = (fn, ms) => { let t; return (...a)=>{ clearTimeout(t); t=setTimeout(()=>fn(...a),ms); }; };
+const cssVar = name => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+
+function toast(msg){
+  const t = $("#toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast._t); toast._t = setTimeout(()=>t.classList.remove("show"), 1600);
+}
+async function copyText(text, btn){
+  let ok = false;
+  try{ await navigator.clipboard.writeText(text); ok = true; }
+  catch(e){
+    const ta = document.createElement("textarea");
+    ta.value = text; ta.style.cssText = "position:fixed;opacity:0";
+    document.body.appendChild(ta); ta.select();
+    try{ ok = document.execCommand("copy"); }catch(_){}
+    ta.remove();
+  }
+  if(ok){
+    toast("Copied! キックオフプロンプトをコピーしました");
+    if(btn){ const o=btn.textContent; btn.textContent="Copied!"; btn.classList.add("copied");
+      setTimeout(()=>{ btn.textContent=o; btn.classList.remove("copied"); },1400); }
+  }else toast("コピーに失敗しました");
+}
+
+/* ========= テーマ ========= */
+function initTheme(){
+  let saved=null; try{ saved=localStorage.getItem("di-theme"); }catch(e){}
+  const theme = saved || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark":"light");
+  document.documentElement.dataset.theme = theme;
+  $("#themeBtn").addEventListener("click", ()=>{
+    const next = document.documentElement.dataset.theme==="dark" ? "light":"dark";
+    document.documentElement.dataset.theme = next;
+    try{ localStorage.setItem("di-theme", next); }catch(e){}
+    rebuildCharts();
+  });
+}
+
+/* ========= データ読み込み ========= */
+async function load(){
+  try{
+    const res = await fetch("./loops_1000.json");
+    if(!res.ok) throw new Error("HTTP "+res.status);
+    DATA = await res.json();
+  }catch(err){
+    $("#grid").innerHTML = `<div class="empty"><b>loops_1000.json を読み込めませんでした</b>
+      file:// で直接開くと fetch が失敗します。<br>このフォルダで <code class="mono">python -m http.server 8000</code> を実行し、<br>
+      <code class="mono">http://localhost:8000</code> からアクセスしてください。<br><span class="mono" style="font-size:11px">(${esc(err.message)})</span></div>`;
+    return;
+  }
+  DATA.loops.forEach(l=>{
+    l._search = (l.title+" "+l.goal+" "+l.strategy+" "+l.context+" "+l.tags.join(" ")+" "+l.industry+" "+l.service).toLowerCase();
+  });
+  DATA._svc = Object.fromEntries(DATA.services.map(s=>[s.key,s]));
+  DATA._ind = Object.fromEntries(DATA.industries.map(s=>[s.key,s]));
+  DATA._pain = Object.fromEntries(DATA.pains.map(p=>[p.key,p]));
+  buildStatic();
+  buildCharts();
+  apply();
+}
+
+/* ========= 静的UI ========= */
+function buildStatic(){
+  const m=DATA.meta, loops=DATA.loops;
+  const manual=loops.filter(l=>l.trigger==="manual").length;
+  const interval=loops.length-manual;
+
+  $("#hdCount").innerHTML = `<b>${loops.length.toLocaleString()}</b> loops / <b>${DATA.services.length}</b> services / <b>${DATA.industries.length}</b> industries`;
+  $("#footMeta").textContent = `${m.name} — ${m.generatedAt} 生成 / ${loops.length} loops / 典拠: digitalidentity.co.jp・di-kb / ${m.confidentiality}`;
+
+  $("#kpis").innerHTML = `
+    <div class="kpi"><div class="v">${loops.length.toLocaleString()}</div><div class="l">総ループ数</div><div class="x">戦略・戦術込みのキックオフプロンプト</div></div>
+    <div class="kpi"><div class="v">${DATA.services.length}</div><div class="l">サービス分類</div><div class="x">デジタルアイデンティティ社の提供サービス</div></div>
+    <div class="kpi"><div class="v">${DATA.industries.length}</div><div class="l">業種分類</div><div class="x">主要業種＋業種横断</div></div>
+    <div class="kpi"><div class="v">${DATA.pains.length}</div><div class="l">課題タイプ</div><div class="x">課題から複数ループを提案</div></div>`;
+
+  $("#trigRows").innerHTML = [["manual",manual,"var(--primary)"],["interval",interval,"var(--ok)"]].map(([k,v,c])=>`
+    <div class="trig-row"><span class="tl">${k}</span>
+      <div class="trig-bar"><i style="width:${(v/loops.length*100).toFixed(1)}%;background:${c}"></i></div>
+      <span class="tv">${v}</span></div>`).join("");
+
+  // 軸タブ（チャート用 / 絞り込み用）
+  $("#chartAxisTabs").innerHTML =
+    `<button class="axis-tab" data-axis="service">サービス別</button>
+     <button class="axis-tab" data-axis="industry">業種別</button>`;
+  $("#chartAxisTabs").addEventListener("click", e=>{
+    const b=e.target.closest(".axis-tab"); if(!b) return;
+    chartAxis=b.dataset.axis; syncAxisTabs(); rebuildCharts();
+    $("#axisChartTitle").textContent = chartAxis==="service" ? "サービス別ループ数":"業種別ループ数";
+  });
+  $("#filterAxisTabs").innerHTML =
+    `<button class="axis-tab" data-axis="service">サービスで絞る</button>
+     <button class="axis-tab" data-axis="industry">業種で絞る</button>
+     <button class="axis-tab" data-axis="pain">課題で絞る</button>`;
+  $("#filterAxisTabs").addEventListener("click", e=>{
+    const b=e.target.closest(".axis-tab"); if(!b) return;
+    filterAxis=b.dataset.axis; chartAxis = (filterAxis==="industry"?"industry":"service");
+    syncAxisTabs(); buildPrimarySelect(); rebuildCharts();
+    $("#axisChartTitle").textContent = chartAxis==="service" ? "サービス別ループ数":"業種別ループ数";
+    apply();
+  });
+  syncAxisTabs();
+  buildPrimarySelect();
+
+  // 課題グリッド
+  $("#painGrid").innerHTML = DATA.pains.map(p=>`
+    <button class="pain-card" data-pain="${esc(p.key)}">
+      <div class="pt">${esc(p.name)}<span class="pc">${p.loopCount}</span></div>
+      <div class="pd">${esc(p.description)}</div>
+    </button>`).join("");
+  $("#painGrid").addEventListener("click", e=>{
+    const b=e.target.closest(".pain-card"); if(!b) return;
+    const k=b.dataset.pain;
+    state.pain = (state.pain===k) ? "all" : k;
+    state.page=1; apply();
+    $("#browse").scrollIntoView({behavior:"smooth"});
+  });
+
+  // カテゴリ／トリガーチップ
+  $("#catChips").innerHTML = `<button class="chip" data-v="all">すべて</button>`+
+    DATA.categories.map(c=>`<button class="chip" data-v="${esc(c)}">${esc(c)}</button>`).join("");
+  $("#trigChips").innerHTML = `<button class="chip" data-v="all">すべて</button>`+
+    DATA.triggers.map(t=>`<button class="chip" data-v="${esc(t)}">${esc(t)}</button>`).join("");
+  $("#catChips").addEventListener("click", e=>{ const b=e.target.closest(".chip"); if(b) setFilter("category",b.dataset.v); });
+  $("#trigChips").addEventListener("click", e=>{ const b=e.target.closest(".chip"); if(b) setFilter("trigger",b.dataset.v); });
+
+  // 検索
+  const onSearch = debounce(v=>{ state.q=v.trim().toLowerCase(); state.page=1; apply(); },150);
+  $("#q").addEventListener("input", e=>{ $("#qClear").style.display=e.target.value?"block":"none"; onSearch(e.target.value); });
+  $("#qClear").addEventListener("click", ()=>{ $("#q").value=""; $("#qClear").style.display="none"; state.q=""; state.page=1; apply(); });
+
+  $("#clearAll").addEventListener("click", ()=>{
+    state={ service:"all",industry:"all",pain:"all",category:"all",trigger:"all",q:"",page:1 };
+    $("#q").value=""; $("#qClear").style.display="none"; apply();
+  });
+
+  // モーダル
+  $("#mClose").addEventListener("click", closeModal);
+  $("#overlay").addEventListener("click", e=>{ if(e.target===$("#overlay")) closeModal(); });
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape") closeModal(); });
+
+  // カードのイベント委譲
+  $("#grid").addEventListener("click", e=>{
+    const cp=e.target.closest("[data-copy]");
+    if(cp){ const l=DATA.loops.find(x=>x.id===cp.dataset.copy); if(l) copyText(l.kickoffPrompt,cp); return; }
+    const vw=e.target.closest("[data-view]");
+    if(vw){ const l=DATA.loops.find(x=>x.id===vw.dataset.view); if(l) openModal(l); }
+  });
+}
+
+function syncAxisTabs(){
+  document.querySelectorAll("#chartAxisTabs .axis-tab").forEach(b=>b.classList.toggle("on", b.dataset.axis===chartAxis));
+  document.querySelectorAll("#filterAxisTabs .axis-tab").forEach(b=>b.classList.toggle("on", b.dataset.axis===filterAxis));
+}
+
+function buildPrimarySelect(){
+  const sel=$("#primarySelect");
+  if(filterAxis==="service"){
+    sel.innerHTML = `<option value="all">すべてのサービス（${DATA.loops.length}）</option>`+
+      DATA.services.map(s=>`<option value="${esc(s.key)}">${esc(s.name)}（${s.loopCount}）</option>`).join("");
+    sel.value = state.service;
+    sel.onchange = e=>setFilter("service", e.target.value);
+  }else if(filterAxis==="industry"){
+    sel.innerHTML = `<option value="all">すべての業種（${DATA.loops.length}）</option>`+
+      DATA.industries.map(s=>`<option value="${esc(s.key)}">${esc(s.name)}（${s.loopCount}）</option>`).join("");
+    sel.value = state.industry;
+    sel.onchange = e=>setFilter("industry", e.target.value);
+  }else{
+    sel.innerHTML = `<option value="all">すべての課題</option>`+
+      DATA.pains.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}（${p.loopCount}）</option>`).join("");
+    sel.value = state.pain;
+    sel.onchange = e=>setFilter("pain", e.target.value);
+  }
+}
+
+/* ========= フィルタ ========= */
+function setFilter(key, value){
+  state[key] = (state[key]===value && value!=="all") ? "all" : value;
+  state.page = 1;
+  apply();
+}
+
+function apply(){
+  filtered = DATA.loops.filter(l =>
+    (state.service==="all"  || l.serviceKey===state.service) &&
+    (state.industry==="all" || l.industryKey===state.industry) &&
+    (state.pain==="all"     || l.painPoints.includes(state.pain)) &&
+    (state.category==="all" || l.category===state.category) &&
+    (state.trigger==="all"  || l.trigger===state.trigger) &&
+    (!state.q || l._search.includes(state.q))
+  );
+  syncControls();
+  renderAxisDetail();
+  renderGrid();
+  renderPager();
+  updateChartHighlight();
+}
+
+function syncControls(){
+  buildPrimarySelect();
+  document.querySelectorAll("#catChips .chip").forEach(b=>b.classList.toggle("on", b.dataset.v===state.category));
+  document.querySelectorAll("#trigChips .chip").forEach(b=>b.classList.toggle("on", b.dataset.v===state.trigger));
+  document.querySelectorAll(".pain-card").forEach(b=>b.classList.toggle("on", b.dataset.pain===state.pain));
+  $("#count").textContent = filtered.length.toLocaleString();
+
+  const pills=[];
+  if(state.service!=="all")  pills.push(`<button class="active-pill" data-k="service">サービス: ${esc(DATA._svc[state.service]?.name||state.service)} ✕</button>`);
+  if(state.industry!=="all") pills.push(`<button class="active-pill" data-k="industry">業種: ${esc(DATA._ind[state.industry]?.name||state.industry)} ✕</button>`);
+  if(state.pain!=="all")     pills.push(`<button class="active-pill" data-k="pain">課題: ${esc(DATA._pain[state.pain]?.name||state.pain)} ✕</button>`);
+  if(state.category!=="all") pills.push(`<button class="active-pill" data-k="category">カテゴリ: ${esc(state.category)} ✕</button>`);
+  if(state.trigger!=="all")  pills.push(`<button class="active-pill" data-k="trigger">トリガー: ${esc(state.trigger)} ✕</button>`);
+  if(state.q)                pills.push(`<button class="active-pill" data-k="q">検索: "${esc(state.q)}" ✕</button>`);
+  $("#activePills").innerHTML = pills.join("");
+  $("#clearAll").style.display = pills.length ? "inline":"none";
+  document.querySelectorAll(".active-pill").forEach(b=>b.addEventListener("click", ()=>{
+    if(b.dataset.k==="q"){ state.q=""; $("#q").value=""; $("#qClear").style.display="none"; }
+    else state[b.dataset.k]="all";
+    state.page=1; apply();
+  }));
+}
+
+/* ========= 軸詳細 ========= */
+function renderAxisDetail(){
+  const box=$("#axisDetail");
+  let key=null, rec=null, color=null, pred=null;
+  if(state.service!=="all"){ key="service"; rec=DATA._svc[state.service]; color=SVC_COLORS[state.service]; pred=l=>l.serviceKey===state.service; }
+  else if(state.industry!=="all"){ key="industry"; rec=DATA._ind[state.industry]; color=IND_COLORS[state.industry]; pred=l=>l.industryKey===state.industry; }
+  else if(state.pain!=="all"){ key="pain"; rec=DATA._pain[state.pain]; color="var(--primary)"; pred=l=>l.painPoints.includes(state.pain); }
+  if(!rec){ box.classList.remove("show"); box.innerHTML=""; return; }
+
+  const subset = DATA.loops.filter(pred);
+  const byCat={}; DATA.categories.forEach(c=>byCat[c]=0); subset.forEach(l=>byCat[l.category]++);
+  const heading = key==="pain" ? esc(rec.name)+" に効くループ" : esc(rec.name)+"のループ";
+  const badgeCls = key==="service"?"svc":key==="industry"?"ind":"cat";
+  const badgeStyle = key==="pain" ? "" : "background:"+color;
+  box.innerHTML = `
+    <div class="sd-head">
+      <span class="badge ${badgeCls}" style="${badgeStyle}">${esc(rec.name)}</span>
+      <h3>${heading}</h3>
+      <span class="sd-count">${subset.length} loops</span>
+    </div>
+    <p>${esc(rec.description)}</p>
+    <div class="chip-list" style="margin-top:12px">
+      ${DATA.categories.map(c=>`<span style="border-left:3px solid ${CAT_COLORS[c]}">${esc(c)} ${byCat[c]}</span>`).join("")}
+    </div>`;
+  box.classList.add("show");
+}
+
+/* ========= カード ========= */
+function ringSVG(maxIter){
+  const max=12, r=14, c=2*Math.PI*r;
+  const ratio=Math.min(maxIter/max,1);
+  return `<svg class="ring" viewBox="0 0 34 34" aria-hidden="true">
+    <circle class="track" cx="17" cy="17" r="${r}"/>
+    <circle class="val" cx="17" cy="17" r="${r}" stroke-dasharray="${(c*ratio).toFixed(1)} ${c.toFixed(1)}"/>
+    <text x="17" y="21" text-anchor="middle">${maxIter}</text></svg>`;
+}
+function cardHTML(l){
+  const sc=SVC_COLORS[l.serviceKey]||"#666", ic=IND_COLORS[l.industryKey]||"#666";
+  return `<article class="card">
+    <div class="badges">
+      <span class="badge svc" style="background:${sc}">${esc(l.service.split("・")[0].split("（")[0])}</span>
+      <span class="badge ind" style="background:${ic}">${esc(l.industry.split("（")[0])}</span>
+      <span class="badge cat" style="border-left:3px solid ${CAT_COLORS[l.category]||"var(--line2)"}">${esc(l.category)}</span>
+      <span class="badge trg ${l.trigger}">${esc(l.trigger)}</span>
+      <span class="badge trg" title="一度で終わらず常に回り続けるループ">${l.loopMode==="continuous"?"♻ 継続":"♻ 反復"}</span>
+    </div>
+    <h4>${esc(l.title)}</h4>
+    <div class="goal">${esc(l.goal)}</div>
+    <div class="strat">${esc(l.strategy)}</div>
+    <div class="iter-line">${ringSVG(l.maxIterations)}
+      <div class="exit"><b>MAX ${l.maxIterations} ITER ・ EXIT WHEN</b>${esc(l.exitCondition)}</div></div>
+    <div class="kpi-tags">${l.kpis.slice(0,4).map(k=>`<span class="ktag">${esc(k)}</span>`).join("")}</div>
+    <div class="pain-tags">${l.painPoints.map(p=>`<span class="ptag">${esc(DATA._pain[p]?.name||p)}</span>`).join("")}</div>
+    <div class="card-foot">
+      <span class="agents">${l.agents.map(esc).join(" / ")}</span>
+      <button class="btn" data-view="${esc(l.id)}">詳細</button>
+      <button class="btn primary" data-copy="${esc(l.id)}">Copy</button>
+    </div></article>`;
+}
+function renderGrid(){
+  const start=(state.page-1)*PER_PAGE;
+  const page=filtered.slice(start,start+PER_PAGE);
+  if(!page.length){ $("#grid").innerHTML=`<div class="empty"><b>該当するループがありません</b>フィルタ条件や課題・検索キーワードを変更してください。</div>`; return; }
+  $("#grid").innerHTML = page.map(cardHTML).join("");
+}
+
+/* ========= ページネーション ========= */
+function renderPager(){
+  const total=Math.max(1,Math.ceil(filtered.length/PER_PAGE));
+  if(state.page>total) state.page=total;
+  const p=state.page, el=$("#pager");
+  if(filtered.length<=PER_PAGE){ el.innerHTML=""; return; }
+  const nums=new Set([1,2,p-1,p,p+1,total-1,total]);
+  const list=[...nums].filter(n=>n>=1&&n<=total).sort((a,b)=>a-b);
+  let html=`<button class="pbtn" data-p="${p-1}" ${p===1?"disabled":""}>‹</button>`;
+  let prev=0;
+  for(const n of list){ if(n-prev>1) html+=`<span class="pdots">…</span>`;
+    html+=`<button class="pbtn ${n===p?"on":""}" data-p="${n}">${n}</button>`; prev=n; }
+  html+=`<button class="pbtn" data-p="${p+1}" ${p===total?"disabled":""}>›</button>`;
+  const from=(p-1)*PER_PAGE+1, to=Math.min(p*PER_PAGE,filtered.length);
+  html+=`<div class="pinfo">${from}–${to} / ${filtered.length.toLocaleString()} loops</div>`;
+  el.innerHTML=html;
+  el.querySelectorAll(".pbtn[data-p]").forEach(b=>b.addEventListener("click", ()=>{
+    const n=+b.dataset.p;
+    if(n>=1&&n<=total&&n!==state.page){ state.page=n; renderGrid(); renderPager(); $("#browse").scrollIntoView({behavior:"smooth"}); }
+  }));
+}
+
+/* ========= モーダル ========= */
+let currentLoop=null;
+function openModal(l){
+  currentLoop=l;
+  const sc=SVC_COLORS[l.serviceKey]||"#666", ic=IND_COLORS[l.industryKey]||"#666";
+  $("#mBadges").innerHTML = `
+    <span class="badge svc" style="background:${sc}">${esc(l.service)}</span>
+    <span class="badge ind" style="background:${ic}">${esc(l.industry)}</span>
+    <span class="badge cat">${esc(l.category)}</span>
+    <span class="badge trg ${l.trigger}">${esc(l.trigger)}</span>`;
+  $("#mTitle").textContent = l.title;
+  const sixEls = [
+    ["1","Trigger（起動契機）", l.triggerDetail],
+    ["2","Context（前提情報）", l.context],
+    ["3","Action（実行）", l.step1],
+    ["4","Verification（成功確認）", l.checkCommand+" / 終了条件: "+l.exitCondition],
+    ["5","Memory（記録先）", l.memory],
+    ["6","Escalation（人間へ戻す）", l.escalation],
+  ];
+  $("#mBody").innerHTML = `
+    <div class="m-sec">
+      <b class="lbl">エージェントループ6要素</b>
+      <div class="six">
+        ${sixEls.map(([n,t,v])=>`<div class="el"><span class="no">${n}</span><div class="tx"><b>${esc(t)}</b><span>${esc(v)}</span></div></div>`).join("")}
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">戦略（なぜこのループが効くか）</b>
+      <div class="strat-box">
+        <div class="row">${esc(l.strategy)}</div>
+        <div class="row"><span class="tag">KBF / KSF</span> ${esc(l.kbfKsf)}</div>
+        <div class="row"><span class="tag">ASIS → TOBE</span> ${esc(l.asisToBe)}</div>
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">ループ定義（① Trigger ② Context ③ Action ④ Verification）</b>
+      <div class="m-meta">
+        <div class="mm"><b>① Trigger 起動契機</b><span>${esc(l.triggerDetail)}</span></div>
+        <div class="mm"><b>② Context 背景・前提</b><span>${esc(l.context)}</span></div>
+        <div class="mm"><b>Goal</b><span>${esc(l.goal)}</span></div>
+        <div class="mm"><b>③ Action / Step 1</b><span>${esc(l.step1)}</span></div>
+        <div class="mm"><b>Max iterations</b><span class="mono">${l.maxIterations}</span></div>
+        <div class="mm"><b>④ Verification 反復間チェック</b><span>${esc(l.checkCommand)}</span></div>
+        <div class="mm"><b>Exit when 終了条件</b><span>${esc(l.exitCondition)}</span></div>
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">戦術（各イテレーションで回すPDCA）</b>
+      <ol class="tactics">${l.tactics.map(t=>`<li>${esc(t)}</li>`).join("")}</ol>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">運用ルール（⑤ Memory ⑥ Escalation）</b>
+      <div class="m-meta">
+        <div class="mm"><b>⑤ Memory 記録先</b><span>${esc(l.memory)}</span></div>
+        <div class="mm"><b>⑥ Escalation 人間へ戻す</b><span>${esc(l.escalation)}</span></div>
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">継続運用（一度で終わらず、常に回って向上する）</b>
+      <div class="strat-box">
+        <div class="row"><span class="tag">${l.loopMode==="continuous"?"CONTINUOUS / 継続監視型":"RECURRING / サイクル反復型"}</span></div>
+        <div class="row">終了条件を満たしたら水準を新ベースラインに固定し、目標を一段引き上げて次サイクルを開始。引き上げ余地がなければ監視に移り、指標がベースラインを割ったら自動で再起動する（改善のラチェット）。学びは毎回⑤Memoryへ蓄積し、次サイクルの入力にする。</div>
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">成果物・KPI</b>
+      <div class="chip-list" style="margin-bottom:8px">${l.deliverables.map(d=>`<span>${esc(d)}</span>`).join("")}</div>
+      <div class="chip-list">${l.kpis.map(k=>`<span class="mono">${esc(k)}</span>`).join("")}</div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">ガードレール（遵守事項）</b>
+      <ul class="guard">${l.guardrails.map(g=>`<li>${esc(g)}</li>`).join("")}</ul>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">解決する課題</b>
+      <div class="chip-list">${l.painPoints.map(p=>`<span style="color:var(--primary)">${esc(DATA._pain[p]?.name||p)}</span>`).join("")}</div>
+    </div>
+    <div class="m-sec">
+      <div class="prompt-head"><b>KICKOFF PROMPT</b><button class="btn primary" id="mCopy">Copy</button></div>
+      <pre class="prompt" id="mPrompt"></pre>
+    </div>`;
+  $("#mPrompt").textContent = l.kickoffPrompt;
+  $("#mCopy").addEventListener("click", e=>copyText(l.kickoffPrompt, e.currentTarget));
+  $("#overlay").classList.add("show");
+  document.body.style.overflow="hidden";
+}
+function closeModal(){ $("#overlay").classList.remove("show"); document.body.style.overflow=""; currentLoop=null; }
+
+/* ========= チャート ========= */
+function buildCharts(){
+  Chart.defaults.font.family='"IBM Plex Sans JP", sans-serif';
+  Chart.defaults.font.size=11;
+  const ink=cssVar("--ink"), sub=cssVar("--sub"), line=cssVar("--line"), surface=cssVar("--surface");
+
+  const items = chartAxis==="service" ? DATA.services : DATA.industries;
+  axisChart = new Chart($("#axisChart"), {
+    type:"bar",
+    data:{ labels:items.map(s=>s.name), datasets:[{ data:items.map(s=>s.loopCount),
+      backgroundColor:axisBarColors(), borderRadius:5, barPercentage:.72 }]},
+    options:{ indexAxis:"y", responsive:true, maintainAspectRatio:false,
+      onClick:(e,els)=>{ if(els.length){ const k=items[els[0].index].key; setFilter(chartAxis, k); } },
+      onHover:(e,els)=>{ e.native.target.style.cursor=els.length?"pointer":"default"; },
+      plugins:{ legend:{display:false}, tooltip:{callbacks:{label:c=>` ${c.parsed.x} loops（クリックで絞り込み）`}} },
+      scales:{ x:{grid:{color:line},ticks:{color:sub,font:{family:"IBM Plex Mono"}},beginAtZero:true},
+               y:{grid:{display:false},ticks:{color:ink}} } }
+  });
+
+  const catCounts = DATA.categories.map(c=>DATA.loops.filter(l=>l.category===c).length);
+  catChart = new Chart($("#catChart"), {
+    type:"doughnut",
+    data:{ labels:DATA.categories, datasets:[{ data:catCounts,
+      backgroundColor:DATA.categories.map(c=>CAT_COLORS[c]), borderColor:surface, borderWidth:3, hoverOffset:6 }]},
+    options:{ responsive:true, maintainAspectRatio:false, cutout:"62%",
+      onClick:(e,els)=>{ if(els.length){ setFilter("category", DATA.categories[els[0].index]); } },
+      onHover:(e,els)=>{ e.native.target.style.cursor=els.length?"pointer":"default"; },
+      plugins:{ legend:{position:"right",labels:{color:ink,boxWidth:12,boxHeight:12,padding:9,font:{size:10}}},
+        tooltip:{callbacks:{label:c=>` ${c.label}: ${c.parsed} 件（${(c.parsed/DATA.loops.length*100).toFixed(1)}%）`}} } }
+  });
+}
+function axisBarColors(){
+  const items = chartAxis==="service" ? DATA.services : DATA.industries;
+  const colors = chartAxis==="service" ? SVC_COLORS : IND_COLORS;
+  const sel = chartAxis==="service" ? state.service : state.industry;
+  return items.map(s=>{ const base=colors[s.key]||"#666"; return (sel==="all"||sel===s.key)?base:base+"33"; });
+}
+function updateChartHighlight(){
+  if(axisChart){ axisChart.data.datasets[0].backgroundColor=axisBarColors(); axisChart.update("none"); }
+  if(catChart){ catChart.data.datasets[0].backgroundColor=DATA.categories.map(c=>{
+    const base=CAT_COLORS[c]; return (state.category==="all"||state.category===c)?base:base+"33"; });
+    catChart.update("none"); }
+}
+function rebuildCharts(){
+  if(!DATA) return;
+  if(axisChart) axisChart.destroy();
+  if(catChart) catChart.destroy();
+  buildCharts(); updateChartHighlight();
+}
+
+/* ========= 起動 ========= */
+initTheme();
+load();
+</script>
+</body>
+</html>

@@ -1,0 +1,7 @@
+__pycache__/
+*.pyc
+build_loops.py
+serve.sh
+skills/
+DASHBOARD_PROMPT.md
+.vercel/
