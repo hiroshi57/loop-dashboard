@@ -1508,6 +1508,10 @@ def build_kickoff(loop):
     for m in loop["coreModules"]:
         L.append(f'・{m["name"]}（{m["role"]}）: {m["desc"]}')
     L.append("")
+    L.append("【検証可能なループの5ステップ方法論】")
+    for s in loop["methodology"]:
+        L.append(f'Step {s["step"]}. {s["name"]}（{s["summary"]}）: {s["desc"]}')
+    L.append("")
     L.append(CONTINUOUS_NOTE)
     L.append("")
     L.append("成果物（Deliverables）:")
@@ -1621,6 +1625,47 @@ def synth_core_modules(loop):
     ]
 
 
+EXPECTED_METHODOLOGY_STEPS = 5
+
+
+def synth_methodology(loop):
+    """記事「検証可能なループの5ステップ方法論」を各ループの実フィールドへマッピングする。
+    Step1 目標契約 / Step2 Agentの実行 / Step3 証拠によるフィードバック /
+    Step4 停止条件 / Step5 経験の還元。証拠（Step3）が出ないLoopは信用しない。"""
+    esc_first = loop["escalation"].split("：", 1)[0].split("。", 1)[0]
+    skills = [m for m in loop["coreModules"] if m["key"] == "skills"][0]["skills"]
+    return [
+        {
+            "step": 1, "name": "目標契約", "summary": "まず完了基準を決める",
+            "desc": (f"着手前に「何をもって完了とするか」を契約として固定する。Goal: {loop['goal']} ／ "
+                     + f"合格条件: {loop['exitCondition']}（最大 {loop['maxIterations']} 反復）。"),
+        },
+        {
+            "step": 2, "name": "Agentの実行", "summary": "複数ツール・複数インスタンスで進める",
+            "desc": (f"複数ツール・複数インスタンスで並行的に進める。初手: {loop['step1']} ／ "
+                     + "担当エージェント: " + " / ".join(loop["agents"])
+                     + " ／ 活用スキル: " + " / ".join(skills[:3]) + " ほか。"),
+        },
+        {
+            "step": 3, "name": "証拠によるフィードバック", "summary": "テスト・ログ・スクリーンショット・CI",
+            "desc": (f"主観でなく証拠で進捗を確認する。点検: {loop['checkCommand']} ／ "
+                     + "証拠となる成果物: " + " / ".join(loop["deliverables"])
+                     + " ／ 計測KPI: " + " / ".join(loop["kpis"])
+                     + "。証拠が出ないLoopは信用しない。"),
+        },
+        {
+            "step": 4, "name": "停止条件", "summary": "合格・ロールバック・人間に引き渡し",
+            "desc": (f"次の分岐で止める/戻す/渡すを判断する。合格（終了条件 {loop['exitCondition']} 達成）なら次サイクルへ、"
+                     + f"逸脱ならロールバック、重い判断は人間へ引き渡す（{esc_first}）。"),
+        },
+        {
+            "step": 5, "name": "経験の還元", "summary": "ルール・skills・harnessの更新",
+            "desc": (f"得た学びをルール・Skills・運用（harness）へ還元する。記録先: {loop['memory']} ／ "
+                     + "達成水準を新ベースラインに固定し、手順（Skills）と目標を更新して次サイクルの入力にする。"),
+        },
+    ]
+
+
 def make_loop(arch, svc_key, ind_key):
     svc_name = SVC_NAME[svc_key]
     ind_name = IND_NAME[ind_key]
@@ -1667,6 +1712,7 @@ def make_loop(arch, svc_key, ind_key):
         "agents": ["Claude Code", "Cursor"],
     }
     loop["coreModules"] = synth_core_modules(loop)
+    loop["methodology"] = synth_methodology(loop)
     loop["kickoffPrompt"] = build_kickoff(loop)
     return loop
 
@@ -1731,6 +1777,13 @@ def main():
         for m in cm:
             if not m.get("name") or not m.get("role") or not m.get("desc"):
                 errors.append(f"空コアモジュール {m.get('key')} @ {l.get('id')}")
+        # 5ステップ方法論の網羅検査（記事準拠）
+        mth = l.get("methodology") or []
+        if [s.get("step") for s in mth] != list(range(1, EXPECTED_METHODOLOGY_STEPS + 1)):
+            errors.append(f"5ステップ不備 {[s.get('step') for s in mth]} @ {l.get('id')}")
+        for s in mth:
+            if not s.get("name") or not s.get("summary") or not s.get("desc"):
+                errors.append(f"空ステップ {s.get('step')} @ {l.get('id')}")
         # プレースホルダ残り検出
         for f in ("goal", "checkCommand", "exitCondition", "step1", "kickoffPrompt",
                   "strategy", "kbfKsf", "asisToBe"):

@@ -773,6 +773,7 @@ function openModal(l){
     ["6","Escalation（人間へ戻す）", l.escalation],
   ];
   const coreModules = l.coreModules || [];
+  const methodology = l.methodology || [];
   $("#mBody").innerHTML = `
     <div class="m-sec">
       <b class="lbl">エージェントループ6要素</b>
@@ -784,6 +785,12 @@ function openModal(l){
       <b class="lbl">Loopを構成する6つのコアモジュール（単発のCronではなく1つの完全フロー）</b>
       <div class="six">
         ${coreModules.map((m,i)=>`<div class="el"><span class="no">${i+1}</span><div class="tx"><b>${esc(m.name)}（${esc(m.role)}）</b><span>${esc(m.desc)}</span>${(m.skills&&m.skills.length)?`<div class="chip-list" style="margin-top:6px">${m.skills.map(s=>`<span class="mono">${esc(s)}</span>`).join("")}</div>`:""}</div></div>`).join("")}
+      </div>
+    </div>` : ""}
+    ${methodology.length ? `<div class="m-sec">
+      <b class="lbl">検証可能なループの5ステップ方法論</b>
+      <div class="six">
+        ${methodology.map(s=>`<div class="el"><span class="no">${s.step}</span><div class="tx"><b>${esc(s.name)}（${esc(s.summary)}）</b><span>${esc(s.desc)}</span></div></div>`).join("")}
       </div>
     </div>` : ""}
     <div class="m-sec">

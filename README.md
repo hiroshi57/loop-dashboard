@@ -52,6 +52,7 @@ npx serve .
 - **戦術（PDCA）**: 各イテレーションで回す Plan→Do→Check→Action の具体手順
 - **成果物 / KPI / ガードレール**: 業種別の規制対応（薬機法・金商法・景表法・アクセシビリティ等）
 - **Loopを構成する6つのコアモジュール**: Automations（ハートビート）/ Worktrees（防護壁）/ Skills（記憶チップ）/ Sub-agents（牽制メカニズム）/ Connectors（腕）/ Memory（過小評価されている部品）。単発のCronではなく1つの完全フローとして連動させる。Skills には [Hermes Agent Skills Hub（agentskills.io）](https://hermes-agent.nousresearch.com/docs/skills/) の実在スキルを、サービス×業種×課題の関連度で割り当てる
+- **検証可能なループの5ステップ方法論**: ① 目標契約（完了基準を決める）② Agentの実行（複数ツール・複数インスタンス）③ 証拠によるフィードバック（テスト・ログ・KPI）④ 停止条件（合格・ロールバック・人間引き渡し）⑤ 経験の還元（ルール・Skills・運用の更新）。証拠が出ないLoopは信用しない
 - **キックオフプロンプト**: 上記を束ねた、貼ってすぐ使える全文（Copyボタンでクリップボードへ）
 
 ## 機能
