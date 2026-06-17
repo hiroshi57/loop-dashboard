@@ -1504,6 +1504,10 @@ def build_kickoff(loop):
     L.append(f'⑤ Memory（記録先）: {loop["memory"]}')
     L.append(f'⑥ Escalation（人間へ戻す）: {loop["escalation"]}')
     L.append("")
+    L.append("【Loopを構成する6つのコアモジュール（単発のCronではなく1つの完全フロー）】")
+    for m in loop["coreModules"]:
+        L.append(f'・{m["name"]}（{m["role"]}）: {m["desc"]}')
+    L.append("")
     L.append(CONTINUOUS_NOTE)
     L.append("")
     L.append("成果物（Deliverables）:")
@@ -1516,6 +1520,106 @@ def build_kickoff(loop):
     L.append("")
     L.append(SELF_PACE)
     return "\n".join(L)
+
+EXPECTED_CORE_MODULE_KEYS = ["automations", "worktrees", "skills", "subagents", "connectors", "memory"]
+
+# Hermes Agent Skills Hub（agentskills.io / NousResearch/hermes-agent optional-skills）の
+# 実在スキルを、各サービスの仕事内容との関連度でループに割り振る。表記は "category/skill"。
+SKILL_HUB_SOURCE = "Hermes Agent Skills Hub（agentskills.io）"
+SKILL_HUB_BY_SERVICE = {
+    "strategy":    ["research/domain-intel", "research/parallel-cli", "finance/pptx-author", "software-development/subagent-driven-development", "autonomous-ai-agents/openhands"],
+    "seo":         ["research/scrapling", "research/searxng-search", "software-development/code-wiki", "web-development/page-agent", "research/duckduckgo-search"],
+    "content":     ["creative/creative-ideation", "creative/baoyu-article-illustrator", "creative/concept-diagrams", "research/duckduckgo-search", "productivity/siyuan"],
+    "llmo":        ["mlops/chroma", "mlops/faiss", "mlops/instructor", "mlops/huggingface-tokenizers", "research/domain-intel"],
+    "ad":          ["research/parallel-cli", "finance/excel-author", "research/scrapling", "creative/meme-generation", "autonomous-ai-agents/grok"],
+    "creative-ad": ["creative/kanban-video-orchestrator", "creative/hyperframes", "mlops/stable-diffusion", "creative/baoyu-comic", "creative/pixel-art"],
+    "sns-pr":      ["creative/meme-generation", "communication/one-three-one-rule", "research/osint-investigation", "creative/creative-ideation", "research/duckduckgo-search"],
+    "web":         ["web-development/page-agent", "software-development/rest-graphql-debug", "software-development/code-wiki", "devops/docker-management", "devops/pinggy-tunnel"],
+    "cro":         ["dogfood/adversarial-ux-test", "web-development/page-agent", "research/parallel-cli", "finance/excel-author", "mlops/guidance"],
+    "dx":          ["mcp/fastmcp", "mcp/mcporter", "devops/cli", "email/agentmail", "productivity/telephony"],
+    "analysis":    ["finance/excel-author", "research/parallel-cli", "mlops/chroma", "research/qmd", "finance/3-statement-model"],
+    "research":    ["research/osint-investigation", "research/domain-intel", "research/duckduckgo-search", "research/scrapling", "research/searxng-search"],
+    "cmo":         ["finance/pptx-author", "finance/3-statement-model", "research/domain-intel", "software-development/subagent-driven-development", "autonomous-ai-agents/openhands"],
+}
+# 業種・課題による上書き（関連度の高いスキルを先頭に足す）
+SKILL_HUB_BY_INDUSTRY = {
+    "finance":   ["finance/comps-analysis", "finance/dcf-model", "finance/stocks"],
+    "ec-retail": ["productivity/shopify", "payments/stripe-link-cli"],
+    "btob-saas": ["software-development/rest-graphql-debug", "email/agentmail"],
+}
+SKILL_HUB_BY_PAIN = {
+    "ai-invisible":   ["mlops/chroma", "mlops/faiss"],
+    "research-gap":   ["research/osint-investigation"],
+    "creative-tired": ["creative/creative-ideation"],
+    "data-blind":     ["finance/excel-author"],
+}
+
+
+def assign_skills(svc_key, ind_key, pains):
+    """サービス×業種×課題から、Skills Hub の実在スキルを関連度順に最大5件割り振る。"""
+    ordered = []
+    for s in SKILL_HUB_BY_INDUSTRY.get(ind_key, []):
+        ordered.append(s)
+    for p in pains:
+        for s in SKILL_HUB_BY_PAIN.get(p, []):
+            ordered.append(s)
+    ordered.extend(SKILL_HUB_BY_SERVICE.get(svc_key, []))
+    seen, out = set(), []
+    for s in ordered:
+        if s not in seen:
+            seen.add(s)
+            out.append(s)
+        if len(out) == 5:
+            break
+    return out
+
+
+def synth_core_modules(loop):
+    """記事「Loopを構成する6つのコアモジュール」(Automations / Worktrees / Skills /
+    Sub-agents / Connectors / Memory) を、各ループの実フィールドへマッピングして付与する。
+    LoopはCronではなく、6部品が1つの完全フローとして連動する検証可能な方法論である。"""
+    continuous = loop["loopMode"] == "continuous"
+    esc_first = loop["escalation"].split("：", 1)[0].split("。", 1)[0]
+    tac_brief = " → ".join(t.split("：")[0].split(":")[0].strip() for t in loop["tactics"][:5])
+    skills = assign_skills(loop["serviceKey"], loop["industryKey"], loop["painPoints"])
+    return [
+        {
+            "key": "automations", "name": "Automations", "role": "ハートビート",
+            "desc": (("一定間隔で自動起動し継続監視する心拍" if continuous
+                      else "着手判断ごとに起動してサイクルを反復する心拍")
+                     + f"。{loop['triggerDetail']} 単発のCron実行ではなく、終了条件を満たすまで自律的に回り続ける。"),
+        },
+        {
+            "key": "worktrees", "name": "Worktrees", "role": "防護壁",
+            "desc": ("本番に影響を出さない隔離環境で試行し、検証を通った変更だけを反映する防護壁。"
+                     + "遵守すべきガードレール: " + " / ".join(loop["guardrails"]) + "。"),
+        },
+        {
+            "key": "skills", "name": "Skills", "role": "記憶チップ",
+            "skills": skills,
+            "skillSource": SKILL_HUB_SOURCE,
+            "desc": (f"勝ち筋を手順化して再利用する記憶チップ。{SKILL_HUB_SOURCE} の関連スキルを呼び出す: "
+                     + " / ".join(skills)
+                     + f"。PDCA（{tac_brief}）として毎サイクル実行する。"),
+        },
+        {
+            "key": "subagents", "name": "Sub-agents", "role": "牽制メカニズム",
+            "desc": (f"実行役とは別の視点で成果を点検し暴走を牽制する。点検観点: {loop['checkCommand']}。"
+                     + f"重い判断は人間へ戻す（{esc_first}）。担当エージェント: " + " / ".join(loop["agents"]) + "。"),
+        },
+        {
+            "key": "connectors", "name": "Connectors", "role": "腕",
+            "desc": ("外部のデータ・ツール・成果物へ手を伸ばす腕。入出力をつなぐ — "
+                     + "成果物: " + " / ".join(loop["deliverables"])
+                     + " ／ 追跡KPI: " + " / ".join(loop["kpis"]) + "。"),
+        },
+        {
+            "key": "memory", "name": "Memory", "role": "一番過小評価されている部品",
+            "desc": (f"サイクルをまたいで学びを蓄積する最重要部品。{loop['memory']}"
+                     + " 蓄積した前提・判断・実績差分を次サイクルの入力に戻し、改善のラチェットを効かせる。"),
+        },
+    ]
+
 
 def make_loop(arch, svc_key, ind_key):
     svc_name = SVC_NAME[svc_key]
@@ -1562,6 +1666,7 @@ def make_loop(arch, svc_key, ind_key):
         "tags": tags,
         "agents": ["Claude Code", "Cursor"],
     }
+    loop["coreModules"] = synth_core_modules(loop)
     loop["kickoffPrompt"] = build_kickoff(loop)
     return loop
 
@@ -1618,6 +1723,14 @@ def main():
         for lf in ("deliverables", "kpis", "guardrails", "tags", "tactics"):
             if not l.get(lf):
                 errors.append(f"空リスト {lf} @ {l.get('id')}")
+        # 6つのコアモジュールの網羅検査（記事準拠）
+        cm = l.get("coreModules") or []
+        cm_keys = [m.get("key") for m in cm]
+        if cm_keys != EXPECTED_CORE_MODULE_KEYS:
+            errors.append(f"コアモジュール不備 {cm_keys} @ {l.get('id')}")
+        for m in cm:
+            if not m.get("name") or not m.get("role") or not m.get("desc"):
+                errors.append(f"空コアモジュール {m.get('key')} @ {l.get('id')}")
         # プレースホルダ残り検出
         for f in ("goal", "checkCommand", "exitCondition", "step1", "kickoffPrompt",
                   "strategy", "kbfKsf", "asisToBe"):
