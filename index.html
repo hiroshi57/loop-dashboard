@@ -274,6 +274,45 @@
   @media (max-width:620px){ .six{grid-template-columns:1fr} }
   ol.tactics{margin:0;padding-left:20px;font-size:12.5px;line-height:1.7}
   ol.tactics li{margin-bottom:4px}
+  /* TL;DR（このループがすること） */
+  .tldr{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:14px 16px}
+  .tldr-lead .lbl{margin-bottom:5px}
+  .tldr-lead p{font-size:14px;line-height:1.65;font-weight:600;color:var(--ink);margin:0 0 12px}
+  .tldr-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+  .tldr-meta .tm{background:var(--surface);border:1px solid var(--line);border-radius:9px;padding:9px 11px}
+  .tldr-meta .tm b{display:block;font-size:10px;font-family:"IBM Plex Mono";letter-spacing:.08em;color:var(--primary);margin-bottom:3px}
+  .tldr-meta .tm span{font-size:12px;color:var(--sub);line-height:1.55}
+  /* 流れ（段階的に進んでループする） */
+  /* 早見マップ：全体像を1行で */
+  .cycle-map{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-bottom:12px;padding:10px 12px;background:var(--surface2);border:1px solid var(--line);border-radius:10px}
+  .cm-pill{display:inline-flex;align-items:center;gap:6px;font-size:11.5px;font-weight:700;color:var(--ink)}
+  .cm-pill i{flex:none;font-style:normal;width:18px;height:18px;border-radius:50%;background:var(--primary);color:var(--primary-ink);font-family:"IBM Plex Mono";font-size:10px;display:grid;place-items:center}
+  .cm-pill .cm-tx{display:flex;flex-direction:column;line-height:1.25}
+  .cm-pill .cm-tx b{font-size:11.5px;font-weight:700}
+  .cm-pill .cm-tx em{font-style:normal;font-weight:500;font-size:10px;color:var(--faint)}
+  .cm-arr{color:var(--faint);font-size:13px;font-weight:700}
+  .cm-back{color:var(--primary);font-size:17px}
+  .cm-back-tx{font-size:10.5px;font-weight:700;color:var(--primary)}
+  .flow{display:flex;flex-direction:column;align-items:stretch;gap:0}
+  .flow-step{display:flex;gap:11px;align-items:flex-start;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+  .flow-step .ftx b i{font-style:normal;font-weight:500;font-size:11px;color:var(--faint)}
+  .flow-step .fno{flex:none;width:24px;height:24px;border-radius:50%;background:var(--primary);color:var(--primary-ink);font-family:"IBM Plex Mono";font-size:12px;font-weight:700;display:grid;place-items:center}
+  .flow-step .ftx b{display:block;font-size:12px;font-weight:700;margin-bottom:2px}
+  .flow-step .ftx span{font-size:12.5px;color:var(--sub);line-height:1.6}
+  .flow-arrow{align-self:flex-start;margin-left:23px;color:var(--primary);font-size:15px;line-height:1.1;font-weight:700;padding:3px 0}
+  .flow-loop{margin-top:8px;display:flex;gap:10px;align-items:flex-start;background:var(--surface2);border:1px dashed var(--primary);border-radius:10px;padding:10px 13px;font-size:12px;line-height:1.6;color:var(--ink)}
+  .flow-loop .lc{flex:none;font-size:18px;line-height:1.1;color:var(--primary)}
+  .flow-loop b{color:var(--primary)}
+  /* トリガー（始まり方）チップ */
+  .tchip{display:inline-block;font-size:11px;font-weight:700;border-radius:999px;padding:1px 9px;margin-right:6px;background:var(--primary);color:var(--primary-ink)}
+  .tchip.interval{background:#0E8A5F}
+  /* もっと詳しく（折りたたみ） */
+  details.more{border-top:1px solid var(--line);margin-top:4px}
+  details.more>summary{cursor:pointer;list-style:none;padding:13px 0 5px;font-size:12.5px;font-weight:600;color:var(--primary);display:flex;align-items:center;gap:7px}
+  details.more>summary::-webkit-details-marker{display:none}
+  details.more>summary::before{content:"▸";font-size:11px;transition:transform .2s}
+  details.more[open]>summary::before{transform:rotate(90deg)}
+  details.more .more-body{padding-top:12px}
   .chip-list{display:flex;flex-wrap:wrap;gap:6px}
   .chip-list span{font-size:11.5px;background:var(--surface2);border:1px solid var(--line2);border-radius:7px;padding:3px 9px;color:var(--sub)}
   ul.guard{margin:0;padding-left:18px;font-size:12px;color:var(--sub);line-height:1.7}
@@ -433,6 +472,14 @@ const CAT_COLORS = {
   "戦略立案":"#2B4BD8","調査・分析":"#5A38C9","制作・実装":"#0E7FA8",
   "運用・最適化":"#0E8A5F","品質・コンプラ":"#C77A12","レポート・報告":"#D8266E"
 };
+// トリガー（ループの始まり方）の説明
+const TRIGGER_INFO = {
+  manual:   { icon:"🖐", label:"手動で起動",      short:"手動", note:"人が「やろう」と判断したときに始まる。新規案件・キャンペーン開始・課題の発覚などがきっかけ。" },
+  interval: { icon:"⏱", label:"定期的に自動起動", short:"定期", note:"決めた間隔（週次など）やKPIの変化をきっかけに、自動で始まる。人の指示を待たず回り続ける。" }
+};
+function trigInfo(t){ return TRIGGER_INFO[t] || { icon:"•", label:t, short:t, note:"" }; }
+// triggerDetail 先頭の "manual：" / "interval：" という冗長な英語接頭辞を除去
+function cleanTriggerDetail(s){ return (s||"").replace(/^(manual|interval)\s*[：:]\s*/,""); }
 
 /* ========= 状態 ========= */
 let DATA = null;
@@ -708,8 +755,8 @@ function cardHTML(l){
       <span class="badge svc" style="background:${sc}">${esc(l.service.split("・")[0].split("（")[0])}</span>
       <span class="badge ind" style="background:${ic}">${esc(l.industry.split("（")[0])}</span>
       <span class="badge cat" style="border-left:3px solid ${CAT_COLORS[l.category]||"var(--line2)"}">${esc(l.category)}</span>
-      <span class="badge trg ${l.trigger}">${esc(l.trigger)}</span>
-      <span class="badge trg" title="一度で終わらず常に回り続けるループ">${l.loopMode==="continuous"?"♻ 継続":"♻ 反復"}</span>
+      <span class="badge trg ${l.trigger}" title="${esc(trigInfo(l.trigger).note)}">${trigInfo(l.trigger).icon} ${esc(trigInfo(l.trigger).label)}</span>
+      <span class="badge trg" title="一度で終わらず、完了後も新しい目標で回り続けるループ">${l.loopMode==="continuous"?"♻ 継続して回す":"♻ くり返し回す"}</span>
     </div>
     <h4>${esc(l.title)}</h4>
     <div class="goal">${esc(l.goal)}</div>
@@ -762,7 +809,7 @@ function openModal(l){
     <span class="badge svc" style="background:${sc}">${esc(l.service)}</span>
     <span class="badge ind" style="background:${ic}">${esc(l.industry)}</span>
     <span class="badge cat">${esc(l.category)}</span>
-    <span class="badge trg ${l.trigger}">${esc(l.trigger)}</span>`;
+    <span class="badge trg ${l.trigger}" title="${esc(trigInfo(l.trigger).note)}">${trigInfo(l.trigger).icon} ${esc(trigInfo(l.trigger).label)}</span>`;
   $("#mTitle").textContent = l.title;
   const sixEls = [
     ["1","Trigger（起動契機）", l.triggerDetail],
@@ -774,7 +821,41 @@ function openModal(l){
   ];
   const coreModules = l.coreModules || [];
   const methodology = l.methodology || [];
+  const STEP_LABELS = {Plan:"計画",Do:"実行",Check:"点検",Action:"改善",Raise:"向上"};
+  const STEP_HINT   = {Plan:"まず狙いを決める",Do:"小さく試す",Check:"結果を確かめる",Action:"うまくいかない所を直す",Raise:"できたら基準を上げて次へ"};
+  const steps = l.tactics.map((t,i)=>{
+    const m = t.match(/^([A-Za-z]+)(?:（[^）]*）)?\s*[：:]\s*([\s\S]+)$/);
+    const key = m ? m[1] : null;
+    return { n:i+1,
+      label:(key && STEP_LABELS[key]) ? STEP_LABELS[key] : ("STEP "+(i+1)),
+      hint:(key && STEP_HINT[key]) ? STEP_HINT[key] : "",
+      body: m ? m[2] : t };
+  });
+  // ① ざっと全体像（早見マップ）：1→2→3→4→5、最後は↺で1へ戻る
+  const cycleMap = `<div class="cycle-map">${steps.map(s=>`<span class="cm-pill"><i>${s.n}</i><span class="cm-tx"><b>${esc(s.label)}</b>${s.hint?`<em>${esc(s.hint)}</em>`:""}</span></span>`).join(`<span class="cm-arr" aria-hidden="true">→</span>`)}<span class="cm-arr cm-back" aria-hidden="true">↺</span><span class="cm-back-tx">1へ戻る</span></div>`;
+  // ② 1ステップずつ（縦に段階的に進む）
+  const flowSteps = steps.map(s=>`<div class="flow-step"><span class="fno">${s.n}</span><div class="ftx"><b>STEP ${s.n}・${esc(s.label)}${s.hint?`　<i>${esc(s.hint)}</i>`:""}</b><span>${esc(s.body)}</span></div></div>`).join(`<div class="flow-arrow" aria-hidden="true">↓</div>`);
+  // ③ 最後に1へ戻ってくり返す（ループの締め）
+  const flowHTML = `${cycleMap}<div class="flow">${flowSteps}<div class="flow-loop"><span class="lc">↺</span><span><b>「完了の合図」に届くまで、STEP 1 に戻ってくり返す</b>（最大 ${l.maxIterations} 回）。届いたらこのループは完了。</span></div></div>`;
   $("#mBody").innerHTML = `
+    <div class="m-sec tldr">
+      <div class="tldr-lead">
+        <b class="lbl">このループがすること</b>
+        <p>${esc(l.goal)}</p>
+      </div>
+      <div class="tldr-meta">
+        <div class="tm"><b>いつ動く（始まり方）</b><span><span class="tchip ${l.trigger}">${trigInfo(l.trigger).icon} ${esc(trigInfo(l.trigger).label)}</span>${esc(cleanTriggerDetail(l.triggerDetail))}</span></div>
+        <div class="tm"><b>完了の合図</b><span>${esc(l.exitCondition)}</span></div>
+        <div class="tm"><b>くり返し</b><span>最大 ${l.maxIterations} 回まで</span></div>
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">流れ（1つずつ進み、最後に1へ戻ってくり返す）</b>
+      ${flowHTML}
+    </div>
+    <details class="more">
+      <summary>もっと詳しく見る（戦略・6要素・運用ルール・プロンプト）</summary>
+      <div class="more-body">
     <div class="m-sec">
       <b class="lbl">エージェントループ6要素</b>
       <div class="six">
@@ -814,10 +895,6 @@ function openModal(l){
       </div>
     </div>
     <div class="m-sec">
-      <b class="lbl">戦術（各イテレーションで回すPDCA）</b>
-      <ol class="tactics">${l.tactics.map(t=>`<li>${esc(t)}</li>`).join("")}</ol>
-    </div>
-    <div class="m-sec">
       <b class="lbl">運用ルール（⑤ Memory ⑥ Escalation）</b>
       <div class="m-meta">
         <div class="mm"><b>⑤ Memory 記録先</b><span>${esc(l.memory)}</span></div>
@@ -847,7 +924,9 @@ function openModal(l){
     <div class="m-sec">
       <div class="prompt-head"><b>KICKOFF PROMPT</b><button class="btn primary" id="mCopy">Copy</button></div>
       <pre class="prompt" id="mPrompt"></pre>
-    </div>`;
+    </div>
+      </div>
+    </details>`;
   $("#mPrompt").textContent = l.kickoffPrompt;
   $("#mCopy").addEventListener("click", e=>copyText(l.kickoffPrompt, e.currentTarget));
   $("#overlay").classList.add("show");
