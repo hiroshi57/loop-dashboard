@@ -256,10 +256,13 @@
   .m-sec{margin-bottom:16px}
   .m-sec > b.lbl{font-size:11px;font-family:"IBM Plex Mono";letter-spacing:.12em;color:var(--faint);
     text-transform:uppercase;display:block;margin-bottom:7px}
+  .lbl-note{font-family:"IBM Plex Sans JP",sans-serif;letter-spacing:0;text-transform:none;font-weight:600;font-size:10.5px;color:var(--primary);margin-left:7px}
   .strat-box{background:var(--surface2);border-left:3px solid var(--primary);border-radius:8px;padding:12px 14px;font-size:12.5px;line-height:1.7}
+  .strat-box.ind-spec{border-left-color:#0E8A5F}
   .strat-box .row{margin-bottom:6px}
   .strat-box .row:last-child{margin-bottom:0}
   .strat-box .tag{font-family:"IBM Plex Mono";font-size:10px;color:var(--primary);font-weight:600}
+  .strat-box .tag.warn{color:#C77A12}
   .m-meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px}
   .m-meta .mm{background:var(--surface2);border-radius:10px;padding:10px 12px}
   .m-meta .mm b{display:block;font-size:10px;font-family:"IBM Plex Mono";letter-spacing:.1em;color:var(--faint);text-transform:uppercase;margin-bottom:3px}
@@ -850,7 +853,15 @@ function openModal(l){
       </div>
     </div>
     <div class="m-sec">
-      <b class="lbl">流れ（1つずつ進み、最後に1へ戻ってくり返す）</b>
+      <b class="lbl">この業種での効かせ方（${esc(l.industry)}）<span class="lbl-note">＝業種ごとに違う部分</span></b>
+      <div class="strat-box ind-spec">
+        <div class="row"><span class="tag">前提</span> ${esc(l.context)}</div>
+        <div class="row"><span class="tag">狙い</span> ${esc(l.strategy)}</div>
+        ${(l.guardrails&&l.guardrails.length)?`<div class="row"><span class="tag warn">守ること</span> ${l.guardrails.map(esc).join("　／　")}</div>`:""}
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">進め方の流れ（1つずつ進み、最後に1へ戻ってくり返す）<span class="lbl-note">＝業種共通の定石</span></b>
       ${flowHTML}
     </div>
     <details class="more">
@@ -875,9 +886,8 @@ function openModal(l){
       </div>
     </div>` : ""}
     <div class="m-sec">
-      <b class="lbl">戦略（なぜこのループが効くか）</b>
+      <b class="lbl">戦略の補足（顧客の決め手・勝ち筋／現状→目標）</b>
       <div class="strat-box">
-        <div class="row">${esc(l.strategy)}</div>
         <div class="row"><span class="tag">KBF / KSF</span> ${esc(l.kbfKsf)}</div>
         <div class="row"><span class="tag">ASIS → TOBE</span> ${esc(l.asisToBe)}</div>
       </div>
@@ -912,10 +922,6 @@ function openModal(l){
       <b class="lbl">成果物・KPI</b>
       <div class="chip-list" style="margin-bottom:8px">${l.deliverables.map(d=>`<span>${esc(d)}</span>`).join("")}</div>
       <div class="chip-list">${l.kpis.map(k=>`<span class="mono">${esc(k)}</span>`).join("")}</div>
-    </div>
-    <div class="m-sec">
-      <b class="lbl">ガードレール（遵守事項）</b>
-      <ul class="guard">${l.guardrails.map(g=>`<li>${esc(g)}</li>`).join("")}</ul>
     </div>
     <div class="m-sec">
       <b class="lbl">解決する課題</b>
