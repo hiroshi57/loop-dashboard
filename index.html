@@ -350,6 +350,36 @@
     .f-label{width:100%}
     #axisChartBox{height:420px}
   }
+
+  /* ===== お気に入り ★ ===== */
+  .fav-btn{font-size:14px;color:var(--faint);border-color:var(--line2);padding:0 8px}
+  .fav-btn.on{color:#e8a800;border-color:#e8a800;background:rgba(232,168,0,.08)}
+  .fav-btn:hover{color:#e8a800;border-color:#e8a800}
+  /* お気に入りバー */
+  .fav-bar{
+    position:sticky;bottom:0;z-index:30;
+    background:color-mix(in srgb,var(--surface) 95%,transparent);
+    border-top:1px solid var(--primary);
+    backdrop-filter:blur(8px);
+    display:flex;align-items:center;gap:10px;
+    padding:10px 20px;
+    box-shadow:0 -4px 16px -6px rgba(43,75,216,.18);
+  }
+  .fav-bar #favCount{font-family:"IBM Plex Mono";font-size:12px;font-weight:600;color:var(--primary);flex:1}
+  /* 複数選択バッジ */
+  .pain-multi-badge{
+    margin:6px 0 0;font-size:11px;font-family:"IBM Plex Mono";
+    color:var(--primary-ink);background:var(--primary);
+    display:inline-block;padding:2px 10px;border-radius:999px;
+  }
+  /* 参考値チップ */
+  .bench-chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .bench-chips span{
+    font-size:11px;font-family:"IBM Plex Mono";color:var(--ok);
+    background:color-mix(in srgb,var(--ok) 10%,transparent);
+    border:1px solid color-mix(in srgb,var(--ok) 30%,transparent);
+    border-radius:6px;padding:2px 8px;
+  }
 </style>
 </head>
 <body>
@@ -439,6 +469,13 @@
 
 </main>
 
+<!-- お気に入りバー -->
+<div class="fav-bar" id="favBar" style="display:none" role="region" aria-label="お気に入り">
+  <span id="favCount">0件 選択中</span>
+  <button class="btn primary" id="favExport">まとめてコピー（提案書用）</button>
+  <button class="btn" id="favClear">すべて解除</button>
+</div>
+
 <footer><div class="wrap" id="footMeta"></div></footer>
 
 <!-- モーダル -->
@@ -484,13 +521,39 @@ function trigInfo(t){ return TRIGGER_INFO[t] || { icon:"•", label:t, short:t, 
 // triggerDetail 先頭の "manual：" / "interval：" という冗長な英語接頭辞を除去
 function cleanTriggerDetail(s){ return (s||"").replace(/^(manual|interval)\s*[：:]\s*/,""); }
 
+/* ========= 日本語シノニムマップ ========= */
+const SYNONYMS = {
+  "seo":["検索エンジン最適化","検索上位","検索流入","オーガニック","自然検索"],
+  "広告":["ad","リスティング","運用広告","ppc","google広告","meta広告","yahoo広告"],
+  "cvr":["コンバージョン率","成約率","cv率","転換率"],
+  "cpa":["獲得単価","コスト","cost per"],
+  "llmo":["ai言及","forte","forteai","ai最適化","gpt","gemini","chatgpt","ai推薦"],
+  "sns":["ソーシャル","instagram","twitter","x","tiktok","インスタ","フォロワー"],
+  "lp":["ランディングページ","landing page","ランディング"],
+  "ma":["マーケティングオートメーション","メール自動化","自動化","ステップメール"],
+  "crm":["顧客管理","customer relationship","顧客データ"],
+  "ec":["イーコマース","通販","eコマース","ショッピング","物販","d2c"],
+  "btob":["法人","b2b","企業向け","商談","biz"],
+  "saas":["クラウド","月額","サブスクリプション","ソフトウェア"],
+  "コンテンツ":["記事","オウンドメディア","ブログ","コラム","ライティング"],
+  "解析":["analytics","アナリティクス","ga4","gtm","データ分析","計測"],
+  "クリエイティブ":["バナー","動画","タテファク","縦型","creative","素材"],
+  "pr":["パブリックリレーションズ","プレスリリース","メディア露出","報道"],
+  "インハウス":["内製化","内製","自社運用","体制構築"],
+  "リサーチ":["調査","市場調査","research","ユーザー調査","アンケート"],
+  "リターゲティング":["追客","リターゲ","再訪","カゴ落ち"],
+  "ナーチャリング":["育成","見込み客","リード育成","メール"],
+  "kpi":["指標","目標値","数値","計測"],
+};
+
 /* ========= 状態 ========= */
 let DATA = null;
 let chartAxis = "service";   // チャートの軸
 let filterAxis = "service";  // 絞り込みの主軸（service/industry/pain）
-let state = { service:"all", industry:"all", pain:"all", category:"all", trigger:"all", q:"", page:1 };
+let state = { service:"all", industry:"all", pains:[], category:"all", trigger:"all", q:"", page:1 };
 let filtered = [];
 let axisChart = null, catChart = null;
+let favorites = new Set();  // お気に入りループID集合
 
 /* ========= ユーティリティ ========= */
 const $ = s => document.querySelector(s);
@@ -545,13 +608,20 @@ async function load(){
     return;
   }
   DATA.loops.forEach(l=>{
-    l._search = (l.title+" "+l.goal+" "+l.strategy+" "+l.context+" "+l.tags.join(" ")+" "+l.industry+" "+l.service).toLowerCase();
+    const base = (l.title+" "+l.goal+" "+l.strategy+" "+l.context+" "+l.tags.join(" ")+" "+l.industry+" "+l.service).toLowerCase();
+    const extra = [];
+    for(const [key, syns] of Object.entries(SYNONYMS)){
+      if(base.includes(key)) syns.forEach(s=>extra.push(s.toLowerCase()));
+      syns.forEach(s=>{ if(base.includes(s.toLowerCase())) extra.push(key); });
+    }
+    l._search = base + " " + extra.join(" ");
   });
   DATA._svc = Object.fromEntries(DATA.services.map(s=>[s.key,s]));
   DATA._ind = Object.fromEntries(DATA.industries.map(s=>[s.key,s]));
   DATA._pain = Object.fromEntries(DATA.pains.map(p=>[p.key,p]));
   buildStatic();
   buildCharts();
+  parseHash();
   apply();
 }
 
@@ -607,7 +677,8 @@ function buildStatic(){
   $("#painGrid").addEventListener("click", e=>{
     const b=e.target.closest(".pain-card"); if(!b) return;
     const k=b.dataset.pain;
-    state.pain = (state.pain===k) ? "all" : k;
+    const idx=state.pains.indexOf(k);
+    if(idx>=0) state.pains.splice(idx,1); else state.pains.push(k);
     state.page=1; apply();
     $("#browse").scrollIntoView({behavior:"smooth"});
   });
@@ -626,7 +697,7 @@ function buildStatic(){
   $("#qClear").addEventListener("click", ()=>{ $("#q").value=""; $("#qClear").style.display="none"; state.q=""; state.page=1; apply(); });
 
   $("#clearAll").addEventListener("click", ()=>{
-    state={ service:"all",industry:"all",pain:"all",category:"all",trigger:"all",q:"",page:1 };
+    state={ service:"all",industry:"all",pains:[],category:"all",trigger:"all",q:"",page:1 };
     $("#q").value=""; $("#qClear").style.display="none"; apply();
   });
 
@@ -637,11 +708,22 @@ function buildStatic(){
 
   // カードのイベント委譲
   $("#grid").addEventListener("click", e=>{
+    const fv=e.target.closest("[data-fav]");
+    if(fv){
+      const id=fv.dataset.fav;
+      if(favorites.has(id)){ favorites.delete(id); fv.classList.remove("on"); }
+      else{ favorites.add(id); fv.classList.add("on"); }
+      updateFavBar(); return;
+    }
     const cp=e.target.closest("[data-copy]");
     if(cp){ const l=DATA.loops.find(x=>x.id===cp.dataset.copy); if(l) copyText(l.kickoffPrompt,cp); return; }
     const vw=e.target.closest("[data-view]");
     if(vw){ const l=DATA.loops.find(x=>x.id===vw.dataset.view); if(l) openModal(l); }
   });
+
+  // お気に入りバー
+  $("#favExport").addEventListener("click", exportFavorites);
+  $("#favClear").addEventListener("click", ()=>{ favorites.clear(); renderGrid(); updateFavBar(); });
 }
 
 function syncAxisTabs(){
@@ -662,10 +744,17 @@ function buildPrimarySelect(){
     sel.value = state.industry;
     sel.onchange = e=>setFilter("industry", e.target.value);
   }else{
-    sel.innerHTML = `<option value="all">すべての課題</option>`+
+    sel.innerHTML = `<option value="all">すべての課題（クリックで多選択）</option>`+
       DATA.pains.map(p=>`<option value="${esc(p.key)}">${esc(p.name)}（${p.loopCount}）</option>`).join("");
-    sel.value = state.pain;
-    sel.onchange = e=>setFilter("pain", e.target.value);
+    sel.value = state.pains.length===1 ? state.pains[0] : "all";
+    sel.onchange = e=>{
+      if(e.target.value==="all"){ state.pains=[]; state.page=1; apply(); }
+      else{
+        const k=e.target.value, idx=state.pains.indexOf(k);
+        if(idx>=0) state.pains.splice(idx,1); else state.pains.push(k);
+        state.page=1; apply();
+      }
+    };
   }
 }
 
@@ -677,32 +766,59 @@ function setFilter(key, value){
 }
 
 function apply(){
+  const q = expandQuery(state.q);
   filtered = DATA.loops.filter(l =>
     (state.service==="all"  || l.serviceKey===state.service) &&
     (state.industry==="all" || l.industryKey===state.industry) &&
-    (state.pain==="all"     || l.painPoints.includes(state.pain)) &&
+    (state.pains.length===0 || l.painPoints.some(p=>state.pains.includes(p))) &&
     (state.category==="all" || l.category===state.category) &&
     (state.trigger==="all"  || l.trigger===state.trigger) &&
-    (!state.q || l._search.includes(state.q))
+    (!q || q.some(w=>l._search.includes(w)))
   );
   syncControls();
   renderAxisDetail();
   renderGrid();
   renderPager();
   updateChartHighlight();
+  pushHash();
+}
+
+// 検索クエリをシノニム展開して複数語のOR配列に変換
+function expandQuery(raw){
+  if(!raw) return [];
+  const w = raw.trim().toLowerCase();
+  const words = [w];
+  for(const [key, syns] of Object.entries(SYNONYMS)){
+    if(w===key || syns.some(s=>s.toLowerCase()===w)){
+      words.push(key, ...syns.map(s=>s.toLowerCase()));
+    }
+    if(w.includes(key) || syns.some(s=>w.includes(s.toLowerCase()))){
+      words.push(key, ...syns.map(s=>s.toLowerCase()));
+    }
+  }
+  return [...new Set(words)];
 }
 
 function syncControls(){
   buildPrimarySelect();
   document.querySelectorAll("#catChips .chip").forEach(b=>b.classList.toggle("on", b.dataset.v===state.category));
   document.querySelectorAll("#trigChips .chip").forEach(b=>b.classList.toggle("on", b.dataset.v===state.trigger));
-  document.querySelectorAll(".pain-card").forEach(b=>b.classList.toggle("on", b.dataset.pain===state.pain));
+  document.querySelectorAll(".pain-card").forEach(b=>b.classList.toggle("on", state.pains.includes(b.dataset.pain)));
+  // 複数選択中バッジ
+  const painCount = state.pains.length;
+  document.querySelectorAll(".pain-multi-badge").forEach(e=>e.remove());
+  if(painCount>1){
+    const badge=document.createElement("div");
+    badge.className="pain-multi-badge";
+    badge.textContent=`${painCount}件選択中（OR）`;
+    $("#painGrid").after(badge);
+  }
   $("#count").textContent = filtered.length.toLocaleString();
 
   const pills=[];
   if(state.service!=="all")  pills.push(`<button class="active-pill" data-k="service">サービス: ${esc(DATA._svc[state.service]?.name||state.service)} ✕</button>`);
   if(state.industry!=="all") pills.push(`<button class="active-pill" data-k="industry">業種: ${esc(DATA._ind[state.industry]?.name||state.industry)} ✕</button>`);
-  if(state.pain!=="all")     pills.push(`<button class="active-pill" data-k="pain">課題: ${esc(DATA._pain[state.pain]?.name||state.pain)} ✕</button>`);
+  if(state.pains.length)     pills.push(`<button class="active-pill" data-k="pains">課題: ${state.pains.map(p=>esc(DATA._pain[p]?.name||p)).join(" × ")} ✕</button>`);
   if(state.category!=="all") pills.push(`<button class="active-pill" data-k="category">カテゴリ: ${esc(state.category)} ✕</button>`);
   if(state.trigger!=="all")  pills.push(`<button class="active-pill" data-k="trigger">トリガー: ${esc(state.trigger)} ✕</button>`);
   if(state.q)                pills.push(`<button class="active-pill" data-k="q">検索: "${esc(state.q)}" ✕</button>`);
@@ -710,6 +826,7 @@ function syncControls(){
   $("#clearAll").style.display = pills.length ? "inline":"none";
   document.querySelectorAll(".active-pill").forEach(b=>b.addEventListener("click", ()=>{
     if(b.dataset.k==="q"){ state.q=""; $("#q").value=""; $("#qClear").style.display="none"; }
+    else if(b.dataset.k==="pains") state.pains=[];
     else state[b.dataset.k]="all";
     state.page=1; apply();
   }));
@@ -721,7 +838,7 @@ function renderAxisDetail(){
   let key=null, rec=null, color=null, pred=null;
   if(state.service!=="all"){ key="service"; rec=DATA._svc[state.service]; color=SVC_COLORS[state.service]; pred=l=>l.serviceKey===state.service; }
   else if(state.industry!=="all"){ key="industry"; rec=DATA._ind[state.industry]; color=IND_COLORS[state.industry]; pred=l=>l.industryKey===state.industry; }
-  else if(state.pain!=="all"){ key="pain"; rec=DATA._pain[state.pain]; color="var(--primary)"; pred=l=>l.painPoints.includes(state.pain); }
+  else if(state.pains.length===1){ key="pain"; rec=DATA._pain[state.pains[0]]; color="var(--primary)"; pred=l=>l.painPoints.includes(state.pains[0]); }
   if(!rec){ box.classList.remove("show"); box.innerHTML=""; return; }
 
   const subset = DATA.loops.filter(pred);
@@ -770,6 +887,7 @@ function cardHTML(l){
     <div class="pain-tags">${l.painPoints.map(p=>`<span class="ptag">${esc(DATA._pain[p]?.name||p)}</span>`).join("")}</div>
     <div class="card-foot">
       <span class="agents">${l.agents.map(esc).join(" / ")}</span>
+      <button class="btn fav-btn${favorites.has(l.id)?" on":""}" data-fav="${esc(l.id)}" title="お気に入りに追加">★</button>
       <button class="btn" data-view="${esc(l.id)}">詳細</button>
       <button class="btn primary" data-copy="${esc(l.id)}">Copy</button>
     </div></article>`;
@@ -801,6 +919,65 @@ function renderPager(){
     const n=+b.dataset.p;
     if(n>=1&&n<=total&&n!==state.page){ state.page=n; renderGrid(); renderPager(); $("#browse").scrollIntoView({behavior:"smooth"}); }
   }));
+}
+
+/* ========= パーマリンク（URL hash） ========= */
+function pushHash(){
+  const p=new URLSearchParams();
+  if(state.q)               p.set("q",state.q);
+  if(state.service!=="all") p.set("svc",state.service);
+  if(state.industry!=="all")p.set("ind",state.industry);
+  if(state.pains.length)    p.set("pains",state.pains.join(","));
+  if(state.category!=="all")p.set("cat",state.category);
+  if(state.trigger!=="all") p.set("trg",state.trigger);
+  if(state.page>1)          p.set("p",state.page);
+  const h=p.toString();
+  history.replaceState(null,"",h?"#"+h:location.pathname+location.search);
+}
+function parseHash(){
+  const h=location.hash.slice(1); if(!h) return;
+  const p=new URLSearchParams(h);
+  if(p.has("q"))    { state.q=p.get("q"); const qi=$("#q"); if(qi){ qi.value=state.q; $("#qClear").style.display="block"; } }
+  if(p.has("svc"))  state.service  =p.get("svc");
+  if(p.has("ind"))  state.industry =p.get("ind");
+  if(p.has("pains"))state.pains    =p.get("pains").split(",").filter(Boolean);
+  if(p.has("cat"))  state.category =p.get("cat");
+  if(p.has("trg"))  state.trigger  =p.get("trg");
+  if(p.has("p"))    state.page     =Math.max(1,+p.get("p")||1);
+  if(p.has("svc")||p.has("ind")) filterAxis = p.has("ind")?"industry":"service";
+  if(p.has("pains")) filterAxis = "pain";
+}
+
+/* ========= お気に入り ========= */
+function updateFavBar(){
+  const bar=$("#favBar");
+  if(!bar) return;
+  const n=favorites.size;
+  bar.style.display = n ? "flex":"none";
+  const cnt=bar.querySelector("#favCount");
+  if(cnt) cnt.textContent=n+"件 選択中";
+}
+function exportFavorites(){
+  const loops=[...favorites].map(id=>DATA.loops.find(l=>l.id===id)).filter(Boolean);
+  if(!loops.length){ toast("お気に入りがありません"); return; }
+  const now=new Date().toLocaleDateString("ja-JP");
+  const lines=["# AIエージェントループ 提案セット（DI Loop Library）","生成日: "+now,""];
+  loops.forEach((l,i)=>{
+    lines.push(`## [${i+1}] ${l.title}`);
+    lines.push(`- 業種: ${l.industry} / サービス: ${l.service}`);
+    lines.push(`- Goal: ${l.goal}`);
+    lines.push(`- Strategy: ${l.strategy}`);
+    lines.push(`- MAX ITER: ${l.maxIterations} / EXIT WHEN: ${l.exitCondition}`);
+    if(l.benchmarks&&l.benchmarks.length) lines.push(`- 参考値: ${l.benchmarks.join("、")}`);
+    lines.push("");
+    lines.push("KICKOFF PROMPT:");
+    lines.push(l.kickoffPrompt);
+    lines.push("");
+    lines.push("---");
+    lines.push("");
+  });
+  copyText(lines.join("\n"), $("#favExport"));
+  toast(`${loops.length}件のループを提案書用テキストにコピーしました`);
 }
 
 /* ========= モーダル ========= */
@@ -922,6 +1099,7 @@ function openModal(l){
       <b class="lbl">成果物・KPI</b>
       <div class="chip-list" style="margin-bottom:8px">${l.deliverables.map(d=>`<span>${esc(d)}</span>`).join("")}</div>
       <div class="chip-list">${l.kpis.map(k=>`<span class="mono">${esc(k)}</span>`).join("")}</div>
+      ${(l.benchmarks&&l.benchmarks.length)?`<div class="bench-chips" title="参考値（目標値例）">${l.benchmarks.map(b=>`<span>📈 ${esc(b)}</span>`).join("")}</div>`:``}
     </div>
     <div class="m-sec">
       <b class="lbl">解決する課題</b>
