@@ -773,7 +773,7 @@ function apply(){
     (state.pains.length===0 || l.painPoints.some(p=>state.pains.includes(p))) &&
     (state.category==="all" || l.category===state.category) &&
     (state.trigger==="all"  || l.trigger===state.trigger) &&
-    (!q || q.some(w=>l._search.includes(w)))
+    (!q.length || q.some(w=>l._search.includes(w)))
   );
   syncControls();
   renderAxisDetail();
