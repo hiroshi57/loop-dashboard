@@ -786,7 +786,10 @@ function apply(){
 // 検索クエリをシノニム展開して複数語のOR配列に変換
 function expandQuery(raw){
   if(!raw) return [];
-  const w = raw.trim().toLowerCase();
+  // 日本語カッコ（「」『』）・英語クォート（"'）・全角スペースを除去／正規化
+  const cleaned = raw.replace(/[「」『』""'']/g,"").replace(/　/g," ").trim().toLowerCase();
+  if(!cleaned) return [];
+  const w = cleaned;
   const words = [w];
   for(const [key, syns] of Object.entries(SYNONYMS)){
     if(w===key || syns.some(s=>s.toLowerCase()===w)){
