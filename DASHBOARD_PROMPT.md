@@ -12,7 +12,7 @@
 ### 背景
 
 - ループのフォーマットは https://loops.elorm.xyz/loops を踏襲しています（Goal / Max iterations / Between iterations run / Exit when / Step 1 / Self-pace 指示で構成される「キックオフプロンプト」形式）。
-- 1,000本のループは、株式会社デジタルアイデンティティのサービス分類（https://digitalidentity.co.jp/service/ ）に基づく **16サービス**に分類されています。
+- 1,000本のループは、自社のサービス分類（https://your-company.example.com/service/ ）に基づく **16サービス**に分類されています。
 
 ### データ構造（loops_1000.json）
 

@@ -632,11 +632,11 @@ function buildStatic(){
   const interval=loops.length-manual;
 
   $("#hdCount").innerHTML = `<b>${loops.length.toLocaleString()}</b> loops / <b>${DATA.services.length}</b> services / <b>${DATA.industries.length}</b> industries`;
-  $("#footMeta").textContent = `${m.name} — ${m.generatedAt} 生成 / ${loops.length} loops / 典拠: digitalidentity.co.jp・di-kb / ${m.confidentiality}`;
+  $("#footMeta").textContent = `${m.name} — ${m.generatedAt} 生成 / ${loops.length} loops / 典拠: your-company.example.com・di-kb / ${m.confidentiality}`;
 
   $("#kpis").innerHTML = `
     <div class="kpi"><div class="v">${loops.length.toLocaleString()}</div><div class="l">総ループ数</div><div class="x">戦略・戦術込みのキックオフプロンプト</div></div>
-    <div class="kpi"><div class="v">${DATA.services.length}</div><div class="l">サービス分類</div><div class="x">デジタルアイデンティティ社の提供サービス</div></div>
+    <div class="kpi"><div class="v">${DATA.services.length}</div><div class="l">サービス分類</div><div class="x">自社社の提供サービス</div></div>
     <div class="kpi"><div class="v">${DATA.industries.length}</div><div class="l">業種分類</div><div class="x">主要業種＋業種横断</div></div>
     <div class="kpi"><div class="v">${DATA.pains.length}</div><div class="l">課題タイプ</div><div class="x">課題から複数ループを提案</div></div>`;
 
