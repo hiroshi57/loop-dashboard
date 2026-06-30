@@ -554,6 +554,8 @@ let state = { service:"all", industry:"all", pains:[], category:"all", trigger:"
 let filtered = [];
 let axisChart = null, catChart = null;
 let favorites = new Set();  // お気に入りループID集合
+function loadFavorites(){ try{ const s=localStorage.getItem("di-fav"); if(s) JSON.parse(s).forEach(id=>favorites.add(id)); }catch(e){} }
+function saveFavorites(){ try{ localStorage.setItem("di-fav",JSON.stringify([...favorites])); }catch(e){} }
 
 /* ========= ユーティリティ ========= */
 const $ = s => document.querySelector(s);
@@ -619,6 +621,7 @@ async function load(){
   DATA._svc = Object.fromEntries(DATA.services.map(s=>[s.key,s]));
   DATA._ind = Object.fromEntries(DATA.industries.map(s=>[s.key,s]));
   DATA._pain = Object.fromEntries(DATA.pains.map(p=>[p.key,p]));
+  loadFavorites();
   buildStatic();
   buildCharts();
   parseHash();
@@ -687,7 +690,7 @@ function buildStatic(){
   $("#catChips").innerHTML = `<button class="chip" data-v="all">すべて</button>`+
     DATA.categories.map(c=>`<button class="chip" data-v="${esc(c)}">${esc(c)}</button>`).join("");
   $("#trigChips").innerHTML = `<button class="chip" data-v="all">すべて</button>`+
-    DATA.triggers.map(t=>`<button class="chip" data-v="${esc(t)}">${esc(t)}</button>`).join("");
+    DATA.triggers.map(t=>`<button class="chip" data-v="${esc(t)}" title="${esc(trigInfo(t).note)}">${trigInfo(t).icon} ${esc(trigInfo(t).label)}</button>`).join("");
   $("#catChips").addEventListener("click", e=>{ const b=e.target.closest(".chip"); if(b) setFilter("category",b.dataset.v); });
   $("#trigChips").addEventListener("click", e=>{ const b=e.target.closest(".chip"); if(b) setFilter("trigger",b.dataset.v); });
 
@@ -698,6 +701,9 @@ function buildStatic(){
 
   $("#clearAll").addEventListener("click", ()=>{
     state={ service:"all",industry:"all",pains:[],category:"all",trigger:"all",q:"",page:1 };
+    filterAxis="service"; chartAxis="service";
+    syncAxisTabs(); buildPrimarySelect();
+    $("#axisChartTitle").textContent="サービス別ループ数";
     $("#q").value=""; $("#qClear").style.display="none"; apply();
   });
 
@@ -959,6 +965,7 @@ function updateFavBar(){
   bar.style.display = n ? "flex":"none";
   const cnt=bar.querySelector("#favCount");
   if(cnt) cnt.textContent=n+"件 選択中";
+  saveFavorites();
 }
 function exportFavorites(){
   const loops=[...favorites].map(id=>DATA.loops.find(l=>l.id===id)).filter(Boolean);
