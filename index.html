@@ -544,6 +544,11 @@ const SYNONYMS = {
   "リターゲティング":["追客","リターゲ","再訪","カゴ落ち"],
   "ナーチャリング":["育成","見込み客","リード育成","メール"],
   "kpi":["指標","目標値","数値","計測"],
+  "スパム":["spam","低品質","ペナルティ","品質違反","スパムアップデート","spam update"],
+  "アルゴリズム":["algorithm","algo","コアアップデート","core update","順位変動","ランキング変動"],
+  "アップデート":["update","更新","変動","アルゴリズム更新","コアアップデート"],
+  "順位":["ランキング","rank","検索順位","検索結果","serp","順位変動","急落","急騰"],
+  "リカバリー":["recovery","回復","復旧","ペナルティ解除","回復施策"],
 };
 
 /* ========= 状態 ========= */
@@ -779,7 +784,7 @@ function apply(){
     (state.pains.length===0 || l.painPoints.some(p=>state.pains.includes(p))) &&
     (state.category==="all" || l.category===state.category) &&
     (state.trigger==="all"  || l.trigger===state.trigger) &&
-    (!q.length || q.some(w=>l._search.includes(w)))
+    (!q.length || q.every(group=>group.some(w=>l._search.includes(w))))
   );
   syncControls();
   renderAxisDetail();
@@ -789,23 +794,26 @@ function apply(){
   pushHash();
 }
 
-// 検索クエリをシノニム展開して複数語のOR配列に変換
+// 検索クエリをシノニム展開 → [[token1の候補], [token2の候補], ...]
+// スペース区切りで AND 検索、各トークン内はシノニム OR
 function expandQuery(raw){
   if(!raw) return [];
   // 日本語カッコ（「」『』）・英語クォート（"'）・全角スペースを除去／正規化
   const cleaned = raw.replace(/[「」『』""'']/g,"").replace(/　/g," ").trim().toLowerCase();
   if(!cleaned) return [];
-  const w = cleaned;
-  const words = [w];
-  for(const [key, syns] of Object.entries(SYNONYMS)){
-    if(w===key || syns.some(s=>s.toLowerCase()===w)){
-      words.push(key, ...syns.map(s=>s.toLowerCase()));
+  const tokens = cleaned.split(/\s+/).filter(Boolean);
+  return tokens.map(w => {
+    const words = [w];
+    for(const [key, syns] of Object.entries(SYNONYMS)){
+      if(w===key || syns.some(s=>s.toLowerCase()===w)){
+        words.push(key, ...syns.map(s=>s.toLowerCase()));
+      }
+      if(w.includes(key) || syns.some(s=>w.includes(s.toLowerCase()))){
+        words.push(key, ...syns.map(s=>s.toLowerCase()));
+      }
     }
-    if(w.includes(key) || syns.some(s=>w.includes(s.toLowerCase()))){
-      words.push(key, ...syns.map(s=>s.toLowerCase()));
-    }
-  }
-  return [...new Set(words)];
+    return [...new Set(words)];
+  });
 }
 
 function syncControls(){
