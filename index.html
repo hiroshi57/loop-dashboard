@@ -380,6 +380,61 @@
     border:1px solid color-mix(in srgb,var(--ok) 30%,transparent);
     border-radius:6px;padding:2px 8px;
   }
+
+  /* ===== ソースタブ ===== */
+  .src-bar{display:flex;align-items:center;gap:10px;padding:14px 0 4px;flex-wrap:wrap}
+  .src-tab{
+    padding:7px 18px;border-radius:20px;font-size:13px;font-weight:600;
+    border:1px solid var(--line2);background:var(--surface);color:var(--sub);cursor:pointer;transition:.15s;
+  }
+  .src-tab.on{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
+  .src-tab:hover:not(.on){color:var(--ink);border-color:var(--primary)}
+
+  /* ===== FF セクション ===== */
+  .ff-kpi-strip{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:20px}
+  .ff-filters-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+  .ff-chip{
+    padding:5px 14px;border-radius:20px;font-size:12px;font-weight:600;cursor:pointer;
+    border:1px solid var(--line2);background:var(--surface);color:var(--sub);transition:.15s;
+  }
+  .ff-chip.on{background:var(--primary);color:var(--primary-ink);border-color:var(--primary)}
+  .ff-chip:hover:not(.on){color:var(--ink)}
+  .ff-result-count{font-size:12px;color:var(--sub);margin-left:auto}
+  #ffSection{display:none}
+
+  /* ===== カスタマイザーパネル ===== */
+  .cust-panel{margin-top:22px;padding-top:18px;border-top:2px solid var(--primary-soft)}
+  .cust-toggle{
+    width:100%;display:flex;align-items:center;gap:10px;
+    padding:11px 16px;border-radius:10px;border:none;cursor:pointer;
+    background:var(--primary-soft);color:var(--primary);font-family:inherit;font-size:13px;font-weight:700;
+    transition:.15s;text-align:left;
+  }
+  .cust-toggle:hover{background:var(--primary);color:var(--primary-ink)}
+  .cust-body{display:none;margin-top:16px}
+  .cust-body.open{display:block}
+  .cust-row{margin-bottom:14px}
+  .cust-row label{display:block;font-size:11px;font-weight:700;color:var(--sub);letter-spacing:.07em;text-transform:uppercase;margin-bottom:3px}
+  .cust-hint{font-size:11px;color:var(--faint);margin-bottom:5px;line-height:1.5}
+  .cust-input{
+    width:100%;padding:8px 10px;border-radius:8px;border:1px solid var(--line2);
+    background:var(--surface);color:var(--ink);font-family:inherit;font-size:13px;
+    resize:vertical;min-height:52px;transition:.15s;
+  }
+  .cust-input:focus{outline:none;border-color:var(--primary)}
+  .cust-input::placeholder{color:var(--faint)}
+  .cust-generate-btn{
+    width:100%;margin-top:8px;padding:11px;border:none;border-radius:10px;
+    background:var(--primary);color:var(--primary-ink);font-family:inherit;font-size:13px;font-weight:700;cursor:pointer;
+  }
+  .cust-generate-btn:hover{opacity:.88}
+  .cust-preview{margin-top:16px;padding:14px;background:var(--surface2);border:1px solid var(--line);border-radius:10px}
+  .cust-preview-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .cust-preview-head b{font-size:11px;color:var(--sub);text-transform:uppercase;letter-spacing:.08em}
+  pre.cust-out{
+    white-space:pre-wrap;font-family:"IBM Plex Mono";font-size:11.5px;color:var(--ink);
+    line-height:1.75;max-height:320px;overflow-y:auto;
+  }
 </style>
 </head>
 <body>
@@ -404,7 +459,14 @@
 
 <main class="wrap">
 
-  <!-- ① サマリー -->
+  <!-- ソース選択タブ -->
+  <div class="src-bar" id="srcBar">
+    <button class="src-tab on" data-src="di" id="tabDI">🇯🇵 DI ループ <span id="diTabCount"></span></button>
+    <button class="src-tab" data-src="ff" id="tabFF">🌐 FF ループ <span id="ffTabCount">（読込中…）</span></button>
+  </div>
+
+  <!-- ① DI サマリー -->
+  <div id="diSection">
   <div class="eyebrow">01 / OVERVIEW</div>
   <div class="kpis" id="kpis"></div>
 
@@ -466,6 +528,28 @@
   <!-- カード一覧 -->
   <div class="grid" id="grid"></div>
   <div class="pager" id="pager"></div>
+  </div><!-- /diSection -->
+
+  <!-- FF ループセクション -->
+  <div id="ffSection">
+    <div class="eyebrow">FF LOOP LIBRARY — ForwardFuture</div>
+    <div class="ff-kpi-strip" id="ffKpis">
+      <div class="kpi"><div class="v" id="ffKpiCount">—</div><div class="l">ループ総数</div></div>
+      <div class="kpi"><div class="v" id="ffKpiCats">—</div><div class="l">カテゴリ</div></div>
+      <div class="kpi"><div class="v" id="ffKpiFiltered">—</div><div class="l">絞り込み結果</div></div>
+    </div>
+    <!-- 検索 + カテゴリフィルタ -->
+    <div class="ff-filters-row" id="ffFiltersRow">
+      <div class="search-box" style="flex:1;min-width:220px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="ffQ" type="search" placeholder="タイトル / 説明 / 用途で検索" autocomplete="off">
+        <button class="search-clear" id="ffQClear" aria-label="検索クリア">✕</button>
+      </div>
+      <span class="ff-result-count">該当 <b id="ffCount">—</b> 件</span>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px" id="ffCatChips"></div>
+    <div class="grid" id="ffGrid"></div>
+  </div><!-- /ffSection -->
 
 </main>
 
@@ -1131,6 +1215,9 @@ function openModal(l){
     </details>`;
   $("#mPrompt").textContent = l.kickoffPrompt;
   $("#mCopy").addEventListener("click", e=>copyText(l.kickoffPrompt, e.currentTarget));
+  // カスタマイザーパネルを追加
+  $("#mBody").insertAdjacentHTML("beforeend", buildCustPanel());
+  initCustPanel(l.title, l.kickoffPrompt, l.goal, "");
   $("#overlay").classList.add("show");
   document.body.style.overflow="hidden";
 }
@@ -1186,9 +1273,298 @@ function rebuildCharts(){
   buildCharts(); updateChartHighlight();
 }
 
+/* ========= FF ループ & カスタマイザー ========= */
+
+// ---- FF カタログ読み込み ----
+let FF_DATA = null;
+let ffCatFilter = "all";
+let ffSearchQ = "";
+const FF_CAT_COLORS = {
+  "Engineering":"#0E7FA8","Content":"#0E8A5F",
+  "Evaluation":"#5A38C9","Operations":"#C77A12","Design":"#B0379B"
+};
+
+function loadFF(){
+  fetch("ff_catalog.json")
+    .then(r=>r.json())
+    .then(d=>{
+      FF_DATA = d;
+      FF_DATA._bySlug = {};
+      d.loops.forEach(l=>{ FF_DATA._bySlug[l.slug]=l; });
+      FF_DATA.catList = [...new Set(d.loops.map(l=>l.category.label))];
+      const tEl=$("#ffTabCount"); if(tEl) tEl.textContent="("+d.loops.length+")";
+      const kc=$("#ffKpiCount"); if(kc) kc.textContent=d.loops.length;
+      const kcat=$("#ffKpiCats"); if(kcat) kcat.textContent=FF_DATA.catList.length;
+      if(source==="ff") renderFFGrid();
+    })
+    .catch(()=>{ const el=$("#ffTabCount"); if(el) el.textContent="(読込失敗)"; });
+}
+
+// ---- ソース切替 ----
+let source = "di";
+function switchSource(s){
+  source=s;
+  document.querySelectorAll(".src-tab").forEach(b=>b.classList.toggle("on",b.dataset.src===s));
+  const di=$("#diSection"), ff=$("#ffSection");
+  if(di) di.style.display=s==="di"?"":"none";
+  if(ff) ff.style.display=s==="ff"?"":"none";
+  if(s==="ff" && FF_DATA) renderFFGrid();
+}
+
+// ---- FF グリッド描画 ----
+function renderFFGrid(){
+  if(!FF_DATA) return;
+  const q=ffSearchQ.toLowerCase().trim();
+  let loops=FF_DATA.loops;
+  if(ffCatFilter!=="all") loops=loops.filter(l=>l.category.label===ffCatFilter);
+  if(q) loops=loops.filter(l=>
+    l.title.toLowerCase().includes(q)||
+    l.description.toLowerCase().includes(q)||
+    (l.useWhen||"").toLowerCase().includes(q)||
+    (l.keywords||[]).some(k=>k.toLowerCase().includes(q))
+  );
+  const chipsEl=$("#ffCatChips");
+  if(chipsEl){
+    const allBtn=`<button class="ff-chip${ffCatFilter==="all"?" on":""}" data-ffcat="all">すべて (${FF_DATA.loops.length})</button>`;
+    const cats=FF_DATA.catList.map(c=>{
+      const n=FF_DATA.loops.filter(l=>l.category.label===c).length;
+      return `<button class="ff-chip${ffCatFilter===c?" on":""}" data-ffcat="${esc(c)}">${esc(c)} (${n})</button>`;
+    }).join("");
+    chipsEl.innerHTML=allBtn+cats;
+  }
+  const cnt=$("#ffCount"); if(cnt) cnt.textContent=loops.length;
+  const fkf=$("#ffKpiFiltered"); if(fkf) fkf.textContent=loops.length;
+  const grid=$("#ffGrid"); if(!grid) return;
+  if(!loops.length){ grid.innerHTML='<div class="empty"><b>該当するFFループがありません</b></div>'; return; }
+  grid.innerHTML=loops.map(ffCardHTML).join("");
+}
+
+function ffCardHTML(l){
+  const color=FF_CAT_COLORS[l.category.label]||"#666";
+  const desc=(l.description||"").substring(0,120)+(l.description.length>120?"...":"");
+  const when=(l.useWhen||"").substring(0,90)+((l.useWhen||"").length>90?"...":"");
+  const isFav=favorites.has("ff:"+l.slug);
+  return `<article class="card">
+    <div class="badges">
+      <span class="badge cat" style="border-left:3px solid ${color}">${esc(l.category.label)}</span>
+      <span class="badge trg" style="background:none;border:1px solid var(--line2);color:var(--sub)">FF #${l.number}</span>
+    </div>
+    <h4>${esc(l.title)}</h4>
+    <div class="goal">${esc(desc)}</div>
+    <div class="strat" style="font-size:12px;color:var(--faint)">${esc(when)}</div>
+    <div class="kpi-tags">${(l.keywords||[]).slice(0,3).map(k=>`<span class="ktag">${esc(k)}</span>`).join("")}</div>
+    <div class="card-foot">
+      <span class="agents">${esc(l.author)}</span>
+      <button class="btn fav-btn${isFav?" on":""}" data-fav="ff:${esc(l.slug)}" title="お気に入り">★</button>
+      <button class="btn" data-ffview="${esc(l.slug)}">詳細</button>
+      <button class="btn primary" data-ffcopy="${esc(l.slug)}">Copy</button>
+    </div>
+  </article>`;
+}
+
+// ---- FF モーダル ----
+function openFFModal(loop){
+  currentLoop={_ff:true,...loop};
+  const color=FF_CAT_COLORS[loop.category.label]||"#666";
+  $("#mBadges").innerHTML=`
+    <span class="badge cat" style="border-left:3px solid ${color}">${esc(loop.category.label)}</span>
+    <span class="badge trg" style="background:none;border:1px solid var(--line2);color:var(--sub)">FF Loop #${loop.number}</span>
+    <span style="font-size:11px;color:var(--faint)">${esc(loop.author)} · ${esc(loop.published)}</span>`;
+  $("#mTitle").textContent=loop.title;
+  const stepsHTML=(loop.steps||[]).map((s,i)=>
+    `<div class="flow-step"><span class="fno">${i+1}</span><div class="ftx"><span>${esc(s)}</span></div></div>`+
+    (i<loop.steps.length-1?'<div class="flow-arrow">↓</div>':'')
+  ).join("");
+  const relLinks=(loop.related||[]).slice(0,3).map(r=>
+    `<a href="${esc(r.url)}" target="_blank" rel="noopener" style="color:var(--primary);font-size:12px">${esc(r.title)}</a>`
+  ).join(" · ");
+  $("#mBody").innerHTML=`
+    <div class="m-sec tldr">
+      <div class="tldr-lead">
+        <b class="lbl">このループがすること</b>
+        <p>${esc(loop.description)}</p>
+      </div>
+      <div class="tldr-meta">
+        <div class="tm"><b>使うタイミング</b><span>${esc((loop.useWhen||"").substring(0,200))}</span></div>
+        <div class="tm"><b>完了の合図</b><span>${esc(loop.verification&&loop.verification.title||"")}</span></div>
+        <div class="tm"><b>確認方法</b><span>${esc(loop.verification&&loop.verification.detail||"")}</span></div>
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">進め方の流れ（${(loop.steps||[]).length}ステップ）</b>
+      <div class="flow">
+        ${stepsHTML}
+        <div class="flow-loop"><span class="lc">↺</span><span><b>完了条件を満たすまでループ</b></span></div>
+      </div>
+    </div>
+    <div class="m-sec">
+      <b class="lbl">なぜこのループが効くか</b>
+      <p style="color:var(--sub);font-size:13px;line-height:1.7">${esc(loop.why||"")}</p>
+    </div>
+    <details class="more">
+      <summary>もっと詳しく見る（実装ノート・英語プロンプト・関連ループ）</summary>
+      <div class="more-body">
+        ${loop.implementationNote?`<div class="m-sec"><b class="lbl">実装上の注意</b><p style="color:var(--sub);font-size:13px;line-height:1.7">${esc(loop.implementationNote)}</p></div>`:""}
+        <div class="m-sec">
+          <div class="prompt-head"><b>ループ・プロンプト（英語原文）</b><button class="btn primary" id="mCopy">Copy</button></div>
+          <pre class="prompt" id="mPrompt"></pre>
+        </div>
+        ${relLinks?`<div class="m-sec"><b class="lbl">関連ループ</b><div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:6px">${relLinks}</div></div>`:""}
+      </div>
+    </details>
+    ${buildCustPanel()}`;
+  $("#mPrompt").textContent=loop.prompt||"";
+  $("#mCopy").addEventListener("click", e=>copyText(loop.prompt||"", e.currentTarget));
+  initCustPanel(loop.title, loop.prompt||"", loop.description, loop.url||"");
+  $("#overlay").classList.add("show");
+  document.body.style.overflow="hidden";
+}
+
+// ---- カスタマイザーパネル ----
+function buildCustPanel(){
+  const fields=[
+    {id:"custTiming",label:"どのタイミングで使うか",
+     hint:"例：週次の定例後・KPIが閾値を下回った時・リリース前など（空欄＝元の設定のまま）",
+     ph:"空欄のままにすると元のタイミング設定を使います"},
+    {id:"custAdd",label:"何を追加するか",
+     hint:"このループに足したい要素・ステップ・チェック項目など",
+     ph:"例：ステップ3の後に社内承認フローを追加する"},
+    {id:"custRemove",label:"何を削除・省略するか",
+     hint:"不要なステップや条件があれば記入",
+     ph:"例：最終レポート作成は不要、ステップ2をスキップする"},
+    {id:"custEffect",label:"何に効かせたいか（対象・用途）",
+     hint:"このループを使うプロジェクト・チーム・目標",
+     ph:"例：ECサイトのCVR改善、営業チームの提案書レビュー"},
+    {id:"custRisk",label:"制約・リスク・注意事項",
+     hint:"予算・権限・期限・技術制約・リスクなど",
+     ph:"例：外部データへのアクセス不可、承認は社内のみ"},
+    {id:"custNote",label:"その他コメント・補足（自由記述）",
+     hint:"どこをどう変えたいか、疑問点、試したいアイデアなど自由に",ph:""},
+  ];
+  return `<div class="cust-panel" id="custPanel">
+    <button class="cust-toggle" id="custToggle">
+      ✏️ このループをカスタマイズして自分用に書き換える
+      <span id="custArrow" style="font-size:10px;opacity:.65;margin-left:auto">▼ 開く</span>
+    </button>
+    <div class="cust-body" id="custBody">
+      ${fields.map(f=>`
+        <div class="cust-row">
+          <label for="${f.id}">${f.label}</label>
+          <div class="cust-hint">${f.hint}</div>
+          <textarea class="cust-input" id="${f.id}" placeholder="${esc(f.ph)}" rows="2"></textarea>
+        </div>`).join("")}
+      <button class="cust-generate-btn" id="custGenerate">🔨 オリジナルループを生成する</button>
+      <div class="cust-preview" id="custPreview" style="display:none">
+        <div class="cust-preview-head">
+          <b>生成されたオリジナルループ</b>
+          <button class="btn primary" id="custCopy">📋 エージェントにコピー</button>
+        </div>
+        <pre class="cust-out" id="custOut"></pre>
+      </div>
+    </div>
+  </div>`;
+}
+
+function initCustPanel(title, basePrompt, description, sourceUrl){
+  const toggle=$("#custToggle"), body=$("#custBody"), arrow=$("#custArrow");
+  const gen=$("#custGenerate"), preview=$("#custPreview");
+  const outEl=$("#custOut"), copyBtn=$("#custCopy");
+  if(!toggle) return;
+  toggle.addEventListener("click", ()=>{
+    const open=body.classList.toggle("open");
+    if(arrow) arrow.textContent=open?"▲ 閉じる":"▼ 開く";
+  });
+  gen.addEventListener("click", ()=>{
+    const timing=($("#custTiming")?.value||"").trim();
+    const add   =($("#custAdd")?.value   ||"").trim();
+    const remove=($("#custRemove")?.value||"").trim();
+    const effect=($("#custEffect")?.value||"").trim();
+    const risk  =($("#custRisk")?.value  ||"").trim();
+    const note  =($("#custNote")?.value  ||"").trim();
+    const now=new Date().toLocaleDateString("ja-JP");
+    const SEP="─".repeat(48);
+    const lines=[
+      `# カスタマイズ済みループ: ${title}`,
+      `生成日: ${now}${sourceUrl?" | 元ネタ: "+sourceUrl:""}`,
+      ``,SEP,
+      `## ベースとなる説明`,
+      SEP,
+      description||"",
+      ``,SEP,
+      `## ループ実行プロンプト`,
+      SEP,
+      basePrompt||description||"",``,
+    ];
+    const hasCustom=timing||add||remove||effect||risk||note;
+    if(hasCustom){
+      lines.push(SEP);
+      lines.push(`## カスタマイズポイント`);
+      lines.push(`（以下の条件を優先しながら、上記プロンプトを実行してください）`);
+      lines.push(SEP);
+      if(timing)  lines.push(`▸ タイミング・実行条件: ${timing}`);
+      if(effect)  lines.push(`▸ 効果対象・用途: ${effect}`);
+      if(add)     lines.push(`▸ 追加する要素: ${add}`);
+      if(remove)  lines.push(`▸ 削除・省略する要素: ${remove}`);
+      if(risk)    lines.push(`▸ 制約・リスク: ${risk}`);
+      if(note)    lines.push(`▸ 補足コメント: ${note}`);
+      lines.push(``);
+      lines.push(`※ 全カスタマイズポイントに対応する必要はありません。`);
+      lines.push(`※ 記載のある項目を優先的に考慮して実行してください。`);
+    } else {
+      lines.push(`※ カスタマイズなし。上記のプロンプトをそのまま実行してください。`);
+    }
+    const output=lines.join("\n");
+    outEl.textContent=output;
+    preview.style.display="";
+    preview.scrollIntoView({behavior:"smooth",block:"nearest"});
+    copyBtn.onclick=()=>copyText(output, copyBtn);
+  });
+}
+
+// ---- ソースタブ & FF イベント初期化 ----
+function initFF(){
+  // ソースタブ
+  document.querySelectorAll(".src-tab").forEach(btn=>{
+    btn.addEventListener("click", ()=>switchSource(btn.dataset.src));
+  });
+  // FF グリッドの委譲クリック
+  const ffGrid=$("#ffGrid");
+  if(ffGrid) ffGrid.addEventListener("click", e=>{
+    const fv=e.target.closest("[data-fav]");
+    if(fv){
+      const id=fv.dataset.fav;
+      if(favorites.has(id)){favorites.delete(id);fv.classList.remove("on");}
+      else{favorites.add(id);fv.classList.add("on");}
+      updateFavBar(); return;
+    }
+    const vw=e.target.closest("[data-ffview]");
+    if(vw&&FF_DATA){ const l=FF_DATA._bySlug[vw.dataset.ffview]; if(l) openFFModal(l); return; }
+    const cp=e.target.closest("[data-ffcopy]");
+    if(cp&&FF_DATA){ const l=FF_DATA._bySlug[cp.dataset.ffcopy]; if(l) copyText(l.prompt||l.description, cp); }
+  });
+  // カテゴリチップ委譲
+  const chipsEl=$("#ffCatChips");
+  if(chipsEl) chipsEl.addEventListener("click", e=>{
+    const chip=e.target.closest("[data-ffcat]");
+    if(!chip) return;
+    ffCatFilter=chip.dataset.ffcat; renderFFGrid();
+  });
+  // FF 検索ボックス
+  const ffQEl=$("#ffQ");
+  if(ffQEl){
+    const dFF=debounce(()=>{ ffSearchQ=ffQEl.value; renderFFGrid(); }, 220);
+    ffQEl.addEventListener("input", dFF);
+    ffQEl.addEventListener("search", dFF);
+    const clr=$("#ffQClear");
+    if(clr) clr.addEventListener("click", ()=>{ ffQEl.value=""; ffSearchQ=""; renderFFGrid(); });
+  }
+}
+
 /* ========= 起動 ========= */
 initTheme();
 load();
+loadFF();
+initFF();
 </script>
 </body>
 </html>
